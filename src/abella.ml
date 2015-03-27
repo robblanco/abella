@@ -32,6 +32,23 @@ open Typing
 open Extensions
 open Printf
 open Accumulate
+(******************************************************************************)
+(*RB*)(*A translation module should be hack-added here*)
+let fpc_theorem name thm =
+  fprintf stdout "FPC theorem"
+
+let fpc_define idtys udefs =
+  fprintf stdout "FPC define"
+
+let fpc_codefine idtys udefs =
+  fprintf stdout "FPC codefine"
+
+let fpc_kind ids =
+  fprintf stdout "FPC kind"
+
+let fpc_type ids ty =
+  fprintf stdout "FPC type"
+(******************************************************************************)
 
 let can_read_specification = ref true
 
@@ -578,6 +595,7 @@ let rec process () =
       end ;
       begin match input with
         | Theorem(name, thm) ->
+            fpc_theorem name thm ; (*RB*)
             let thm = type_umetaterm ~sr:!sr ~sign:!sign thm in
               check_theorem thm ;
               theorem thm ;
@@ -595,6 +613,7 @@ let rec process () =
                    compile (CTheorem(n, t)))
                 thms ;
         | Define(idtys, udefs) ->
+            fpc_define idtys udefs ; (*RB*)
             let ids = List.map fst idtys in
               check_noredef ids;
               let (local_sr, local_sign) = locally_add_global_consts idtys in
@@ -604,6 +623,7 @@ let rec process () =
                 compile (CDefine(idtys, defs)) ;
                 add_defs ids Inductive defs
         | CoDefine(idtys, udefs) ->
+            fpc_codefine idtys udefs ; (*RB*)
             let ids = List.map fst idtys in
               check_noredef ids;
               let (local_sr, local_sign) = locally_add_global_consts idtys in
@@ -630,10 +650,12 @@ let rec process () =
                       \ at the begining of a development."
         | Query(q) -> query q
         | Kind(ids) ->
+            fpc_kind ids ; (*RB*)
             check_noredef ids;
             add_global_types ids ;
             compile (CKind ids)
         | Type(ids, ty) ->
+            fpc_type ids ty ; (*RB*)
             check_noredef ids;
             add_global_consts (List.map (fun id -> (id, ty)) ids) ;
             compile (CType(ids, ty))
