@@ -353,14 +353,17 @@ let import filename =
         List.iter
           (function
              | CTheorem(name, thm) ->
+                 fpc_theorem name thm ; (*RB*)
                  add_lemma name thm ;
              | CDefine(idtys, defs) ->
+                 fpc_define idtys defs ; (*RB*)
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
                    add_global_consts idtys ;
                    add_defs ids Inductive defs ;
              | CCoDefine(idtys, defs) ->
+                 fpc_codefine idtys defs ; (*RB*)
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
@@ -369,9 +372,11 @@ let import filename =
              | CImport(filename) ->
                  aux filename
              | CKind(ids) ->
+                 fpc_kind ids ; (*RB*)
                  check_noredef ids;
                  add_global_types ids
              | CType(ids, ty) ->
+                 fpc_type ids ty ; (*RB*)
                  check_noredef ids;
                  add_global_consts (List.map (fun id -> (id, ty)) ids)
              | CClose(ty_subords) ->
