@@ -34,6 +34,20 @@ open Printf
 open Accumulate
 (******************************************************************************)
 (*RB*)(*A translation module should be hack-added here*)
+let fpc_ids ids =
+  String.concat ", " ids
+
+let rec fpc_ty = function Ty(tys, id) ->
+  let tys_str_l = List.map fpc_ty tys            in
+  let tys_str   = String.concat " -> " tys_str_l in
+  match tys with
+  | []          ->                             id (* Simple type *)
+  | [_]         -> "( " ^ tys_str ^ " ) -> " ^ id (* Left-associative *)
+  | _ :: _ :: _ ->        tys_str ^   " -> " ^ id (* Right-associative *)
+
+(*************************
+ * Interface with Abella *
+ *************************)
 let fpc_theorem name thm =
   fprintf stdout "FPC theorem"
 
@@ -43,11 +57,13 @@ let fpc_define idtys udefs =
 let fpc_codefine idtys udefs =
   fprintf stdout "FPC codefine"
 
-let fpc_kind ids =
-  fprintf stdout "FPC kind"
+(* No need for kind declarations: everything will be 'i' *)
+let fpc_kind ids = ""
 
 let fpc_type ids ty =
-  fprintf stdout "FPC type"
+  let ids_str = fpc_ids ids in
+  let ty_str = fpc_ty ty in
+  "Type\t" ^ ids_str ^ "\t" ^ ty_str ^ ".\n"
 (******************************************************************************)
 
 let can_read_specification = ref true
@@ -372,11 +388,11 @@ let import filename =
              | CImport(filename) ->
                  aux filename
              | CKind(ids) ->
-                 fpc_kind ids ; (*RB*)
+                 fprintf stderr "%s" (fpc_kind ids) ; (*RB*)
                  check_noredef ids;
                  add_global_types ids
              | CType(ids, ty) ->
-                 fpc_type ids ty ; (*RB*)
+                 fprintf stderr "%s" (fpc_type ids ty) ; (*RB*)
                  check_noredef ids;
                  add_global_consts (List.map (fun id -> (id, ty)) ids)
              | CClose(ty_subords) ->
@@ -655,12 +671,12 @@ let rec process () =
                       \ at the begining of a development."
         | Query(q) -> query q
         | Kind(ids) ->
-            fpc_kind ids ; (*RB*)
+            fprintf stderr "%s" (fpc_kind ids) ; (*RB*)
             check_noredef ids;
             add_global_types ids ;
             compile (CKind ids)
         | Type(ids, ty) ->
-            fpc_type ids ty ; (*RB*)
+            fprintf stderr "%s" (fpc_type ids ty) ; (*RB*)
             check_noredef ids;
             add_global_consts (List.map (fun id -> (id, ty)) ids) ;
             compile (CType(ids, ty))
