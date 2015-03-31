@@ -13,17 +13,25 @@ open Abella_types
 open Term
 open Metaterm
 
+let rec monomorphize_ty (Ty (tyargs, tyhead)) =
+  let tyhead = match tyhead with
+    | "prop" -> tyhead
+    | _ -> "i"
+  in
+  Ty (List.map monomorphize_ty tyargs, tyhead)
+
 let ship_sign ff =
   let open Prover in
-  let (types, consts) = !sign in
-  List.iter begin fun ty ->
-    if not (List.mem ty ["prop" ; "o" ; "olist"]) then
-      fprintf ff "Kind %s type.@." ty
-  end (List.rev types) ;
+  let (_types, consts) = !sign in
+  (* List.iter begin fun ty -> *)
+  (*   if not (List.mem ty ["prop" ; "o" ; "olist"]) then *)
+  (*     fprintf ff "Kind %s type.@." ty *)
+  (* end (List.rev types) ; *)
+  fprintf ff "Kind i type.@." ;
   List.iter begin fun (k, Typing.Poly (_, ty)) ->
     if not (List.mem k ["member" ; "=>" ; "pi" ; "::" ; "nil"]
             || Hashtbl.mem defs_table k) then
-      fprintf ff "Type %s @[%a@].@." k format_ty ty
+      fprintf ff "Type %s @[%a@].@." k format_ty (monomorphize_ty ty)
   end (List.rev consts)
 
 let all_standard_heads defs =
@@ -35,7 +43,7 @@ let all_standard_heads defs =
 
 let get_vars tyargs =
   List.mapi begin fun n ty ->
-    var Constant ("ZZZ" ^ string_of_int (n + 1)) 0 ty
+    var Constant ("zzz" ^ string_of_int (n + 1)) 0 ty
   end tyargs
 
 let get_case name vars (head, body) =
@@ -67,12 +75,17 @@ let ship_defs ff =
       | (defty, [kk], defs) when k = kk && all_standard_heads defs ->
           fprintf ff "%s %s : @[%a@] by@."
             (match defty with
-             | Inductive -> "Define Inductive"
-             | _ -> "Define CoInductive")
-            k format_ty ty ;
+             | Inductive -> "Define"
+             | _ -> "Define coinductive")
+            k format_ty (monomorphize_ty ty) ;
           let vars = get_vars tyargs in
-          let head_pred = Pred (app (const k ty) vars, Irrelevant) in
-          fprintf ff "@[%a@] := @." format_metaterm head_pred ;
+          (* let head_pred = Pred (app (const k ty) vars, Irrelevant) in *)
+          fprintf ff "@[%s@] := " k ;
+          List.iter begin fun v ->
+            format_term ff v ;
+            pp_print_string ff "\\ " ;
+          end vars ;
+          fprintf ff "@." ;
           let disjs = List.map (get_case k vars) defs in
           let body = disjoin disjs in
           fprintf ff "  @[%a@].@." format_metaterm body ;
