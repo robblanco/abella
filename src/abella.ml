@@ -47,6 +47,8 @@ let count = ref 0
 
 let witnesses = ref false
 
+let input_files = ref []
+
 exception AbortProof
 
 (* Input *)
@@ -515,6 +517,7 @@ let rec process_proof name =
           | Unfold (cs, ss) -> unfold cs ss
           | Intros hs -> intros hs
           | Skip -> skip ()
+          | Ship -> Ship.ship ~file:!input_files ~thm:name
           | Abort -> raise AbortProof
           | Undo -> undo () ; undo () (* undo recent save, and previous save *)
           | Common(Set(k, v)) -> set k v
@@ -707,8 +710,6 @@ let options =
       ("-a", Arg.Set annotate, " Annotate mode") ;
       ("-M", Arg.Set makefile, " Output dependencies in Makefile format")
     ]
-
-let input_files = ref []
 
 let set_input () =
   match !input_files with

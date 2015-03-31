@@ -1,0 +1,17 @@
+Kind nat type.
+Type s nat -> nat.
+Type z nat.
+
+Define is_nat : nat -> prop by
+  is_nat z
+; is_nat (s X) := is_nat X.
+
+Define sum : nat -> nat -> nat -> prop by
+  sum z N N
+; sum (s M) N (s K) := sum M N K.
+
+Theorem sum_n_z : forall N, is_nat N -> sum N z N.
+ship.
+
+Theorem sum_comm : forall M N K, is_nat N -> sum M N K -> sum N M K.
+ship.

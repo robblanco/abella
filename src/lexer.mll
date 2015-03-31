@@ -67,6 +67,7 @@
     "unfold",        UNFOLD ;
     "intros",        INTROS ;
     "skip",          SKIP ;
+    "ship",          SHIP ;
     "abort",         ABORT ;
     "undo",          UNDO ;
     "assert",        ASSERT ;
@@ -144,7 +145,7 @@ rule token = parse
 
 | "_"                { UNDERSCORE }
 | number as n        { NUM (int_of_string n) }
-| name as id          { try Hashtbl.find keyword_table id
+| name as id         { try Hashtbl.find keyword_table id
                        with Not_found -> STRINGID id }
 
 | eof                { EOF }
@@ -152,7 +153,7 @@ rule token = parse
 | '\x04'             { EOF }   (* ctrl-D *)
 
 | _                  { failwith ("Illegal character " ^
-                                   (Lexing.lexeme lexbuf) ^ " in input") }
+                                 (Lexing.lexeme lexbuf) ^ " in input") }
 
 and comment = parse
 | [^ '*' '/' '\n']+  { comment lexbuf }
