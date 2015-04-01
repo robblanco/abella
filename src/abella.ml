@@ -38,8 +38,8 @@ let fpc_ids ids =
   String.concat ", " ids
 
 let rec fpc_ty = function Ty(tys, id) ->
-  let tys_str_l = List.map fpc_ty tys            in
-  let tys_str   = String.concat " -> " tys_str_l in
+  let tys_str_l = List.map fpc_ty tys in
+  let tys_str = String.concat " -> " tys_str_l in
   match tys with
   | []          ->                             id (* Simple type *)
   | [_]         -> "( " ^ tys_str ^ " ) -> " ^ id (* Left-associative *)
@@ -51,8 +51,46 @@ let rec fpc_ty = function Ty(tys, id) ->
 let fpc_theorem name thm =
   fprintf stdout "FPC theorem"
 
+let rec fpc_uterm = function
+  | UCon(pos, id, ty) -> "{Con/" ^ id ^ ", " ^ fpc_ty ty ^ "}"
+  | ULam(pos, id, ty, uterm) -> "{Lam/" ^ id ^ ", " ^ fpc_ty ty ^ ", " ^ fpc_uterm uterm ^ "}"
+  | UApp(pos, uterm_x, uterm_y) -> "{App/" ^ fpc_uterm uterm_x ^ ", " ^ fpc_uterm uterm_y ^ "}"
+
+(*let rec fpc_upred *)
+let fpc_restriction = ""
+(*
+  function
+  | Smaller(n)
+  | Equal(n)
+  | CoSmaller(n)
+  | CoEqual(n)
+  | Irrelevant
+*)
+
+(*TODO Compiled support missing *)
+(* 1. List.map2_exn *)
 let fpc_define idtys udefs =
-  fprintf stdout "FPC define"
+  let fpc_id_ty (id, ty) = "(" ^ id ^ ", " ^ fpc_ty ty ^ ")" in
+  let idtys_l = List.map fpc_id_ty idtys in
+  let idtys_str = String.concat "+" idtys_l in
+  (**)
+  let rec fpc_umetaterm = function
+    | UTrue -> "{tt}"
+    | UFalse -> "{ff}"
+    | UEq(t1, t2) -> "{eq}"
+    | UAsyncObj(t1, t2, r) -> "{async}"
+    | USyncObj(t1, t2, t3, r) -> "{sync}"
+    | UArrow(m1, m2) -> "{" ^ fpc_umetaterm m1 ^ " imp " ^ fpc_umetaterm m2 ^ "}"
+    | UBinding(b, l, m) ->  "{bind}"
+    | UOr(m1, m2) -> "{or}"
+    | UAnd(m1, m2) -> "{and}"
+    | UPred(t, r) -> "{Pred: " ^ fpc_uterm t ^ "}"
+  in
+  let fpc_udef (umt1, umt2) = "{" ^ fpc_umetaterm umt1 ^ "}{" ^ fpc_umetaterm umt2 ^ "}" in
+  let udefs_l = List.map fpc_udef udefs in
+  let udefs_str = String.concat "+" udefs_l in
+  (**)
+  "[" ^ idtys_str ^ "; " ^ udefs_str ^ "]"
 
 let fpc_codefine idtys udefs =
   fprintf stdout "FPC codefine"
@@ -372,7 +410,7 @@ let import filename =
                  fpc_theorem name thm ; (*RB*)
                  add_lemma name thm ;
              | CDefine(idtys, defs) ->
-                 fpc_define idtys defs ; (*RB*)
+                 (*fpc_define idtys defs ;*) (*RB*)
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
@@ -634,7 +672,7 @@ let rec process () =
                    compile (CTheorem(n, t)))
                 thms ;
         | Define(idtys, udefs) ->
-            fpc_define idtys udefs ; (*RB*)
+            fprintf stderr "%s" (fpc_define idtys udefs) ; (*RB*)
             let ids = List.map fst idtys in
               check_noredef ids;
               let (local_sr, local_sign) = locally_add_global_consts idtys in
