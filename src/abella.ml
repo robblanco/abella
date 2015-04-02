@@ -93,17 +93,40 @@ let fpc_udef_head = function
   (* Treatment for predicates *)
   | UPred(uterm, _) ->
   (** ... How will this deal with exotic constructors, taking greater cardinalities? To avoid parenthesizing, I think we need to reproduce the udef_head processing all over
+  Attention: I have divided the function in a recursive part
       @param uterm ...
       @return ...
-      @raise ...
+      @raise Matching errors on invalid structures.
       @author Rob Blanco *)
-  let rec fpc_udef_head_arg uterm =
-    (["Vars"], "Arg")
+  let fpc_udef_head_arg uterm =
+    (** ... At the moment I'm not particularly bothered by list repeats and the like
+        @param
+        @return
+        @raise Matching errors on invalid structures.
+        @author Rob Blanco *)
+    let rec fpc_udef_head_arg_rec level = function
+      (* An identifier at the top is a variable, at the bottom of a degenerate
+         left chain it is a constructor that opens the string representation of
+         the term. *)
+      | UCon(_, id, _) -> if level = 0 then ([id], id) else ([], "(" ^ id)
+      (* An application always consists of two parts: a left traversal of the
+         degenerate tree with its previous arguments, if any, yielding an open
+         (incomplete) term representation. This is the recursive part proper. On
+         the right, the corresponding argument is parsed and added to the string
+         representation. At the top of the chain, this closes the term. *)
+      | UApp(_, uterm_l, uterm_r) ->
+        let (vars_l, arg_l) = fpc_udef_head_arg_rec (level + 1) uterm_l in
+        let (vars_r, arg_r) = fpc_udef_head_arg_rec 0 uterm_r in
+        let terminator = if level = 0 then ")" else "" in
+        (vars_l @ vars_r, arg_l ^ " " ^ arg_r ^ terminator)
+      (* Error *)
+      | ULam(_, _, _, _) -> failwith "uterm not supported"
+    in
+    fpc_udef_head_arg_rec 0 uterm
   in
   (** ... For clarity and in consideration of the limited complexity of what
       might be dubbed "reasonable" predicates, considerations of efficiency are
-      dropped where needed.
-      @param level ...
+      dropped where needed. No need for an explicit level: we know from the number of arguments
       @param uterm ...
       @return A tuple consisting of head constituents in string format for the
        current subtree: {ol
@@ -112,19 +135,19 @@ let fpc_udef_head = function
        {- the ordered list of arguments on those variables.}}
       @raise Matching errors on invalid structures.
       @author Rob Blanco *)
-  let rec fpc_udef_head_rec level = function
+  let rec fpc_udef_head_rec = function
     (* Base case: predicate name at the bottom on the left *)
     | UCon(_, id, _) -> (id, [], [])
     (* Recursive case: process each argument *)
     | UApp(_, uterm_l, uterm_r) ->
-        let (name, vars_l, args_l) = fpc_udef_head_rec (level + 1) uterm_l in
+        let (name, vars_l, args_l) = fpc_udef_head_rec uterm_l in
         let (vars_r, arg_r) = fpc_udef_head_arg uterm_r in
         let vars_uniq = List.sort_uniq String.compare (vars_l @ vars_r) in
         (name, vars_uniq, args_l @ [arg_r])
     (* Errors *)
     | ULam(_, _, _, _) -> failwith "uterm not supported"
   in
-  fpc_udef_head_rec 0 uterm
+  fpc_udef_head_rec uterm
 
 (* includes the final space! --- No more! *)
 let fpc_var_existentials vars =
@@ -157,7 +180,7 @@ let rec fpc_udefs(*_exn*) = function
 let fpc_define(*_exn*) idtys udefs =
   let (name, _) = List.hd idtys in
   "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
-  name ^ "(mu Pred\\Args\\\n" ^
+  name ^ " (mu Pred\\Args\\\n" ^
   fpc_udefs udefs ^
   "\n)."
 
