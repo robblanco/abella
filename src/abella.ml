@@ -69,7 +69,99 @@ let fpc_restriction = ""
 
 (*TODO Compiled support missing *)
 (* 1. List.map2_exn *)
-let fpc_define idtys udefs =
+
+(** ... Apparently I don't know how to pattern match the argument without a FUNCTION
+    @param umetaterm A left-degenerate binary tree consisting of a sequence of
+                     UApp uterms. The deepest UApp is terminated on the right by
+                     a UCon containing the name of the predicate. All are
+                     terminated on the left with a subtree representing an
+                     argument. For a tree of left App depth n, the right child
+                     of the App node at level k represents the (n-k+1)-th
+                     argument. Arguments are expected to be subtrees of UApp and
+                     UCon uterms.
+    @return A tuple consisting of head constituents, all in string format: {ol
+     {- the name of the predicate;}
+     {- the list of variables involved; and}
+     {- the ordered list of arguments on those variables.}}
+    @raise Matching errors on invalid structures.
+    @author Rob Blanco *)
+let fpc_udef_head = function
+  (* Errors *)
+  | UTrue|UFalse|UEq (_, _)|UAsyncObj (_, _, _)|USyncObj (_, _, _, _)|
+    UArrow (_, _)|UBinding (_, _, _)|UOr (_, _)|UAnd (_, _) ->
+    failwith "umetaterm not supported"
+  (* Treatment for predicates *)
+  | UPred(uterm, _) ->
+  (** ... How will this deal with exotic constructors, taking greater cardinalities? To avoid parenthesizing, I think we need to reproduce the udef_head processing all over
+      @param uterm ...
+      @return ...
+      @raise ...
+      @author Rob Blanco *)
+  let rec fpc_udef_head_arg uterm =
+    (["Vars"], "Arg")
+  in
+  (** ... For clarity and in consideration of the limited complexity of what
+      might be dubbed "reasonable" predicates, considerations of efficiency are
+      dropped where needed.
+      @param level ...
+      @param uterm ...
+      @return A tuple consisting of head constituents in string format for the
+       current subtree: {ol
+       {- the name of the predicate;}
+       {- the list of variables involved; and}
+       {- the ordered list of arguments on those variables.}}
+      @raise Matching errors on invalid structures.
+      @author Rob Blanco *)
+  let rec fpc_udef_head_rec level = function
+    (* Base case: predicate name at the bottom on the left *)
+    | UCon(_, id, _) -> (id, [], [])
+    (* Recursive case: process each argument *)
+    | UApp(_, uterm_l, uterm_r) ->
+        let (name, vars_l, args_l) = fpc_udef_head_rec (level + 1) uterm_l in
+        let (vars_r, arg_r) = fpc_udef_head_arg uterm_r in
+        let vars_uniq = List.sort_uniq String.compare (vars_l @ vars_r) in
+        (name, vars_uniq, args_l @ [arg_r])
+    (* Errors *)
+    | ULam(_, _, _, _) -> failwith "uterm not supported"
+  in
+  fpc_udef_head_rec 0 uterm
+
+(* includes the final space! --- No more! *)
+let fpc_var_existentials vars =
+  (*List.fold_left ~init:"" ~f:(fun acc var -> acc ^ "some " ^ var ^ "\\ ") vars*)
+  "some " ^ String.concat "\\ some " vars ^ "\\"
+
+let fpc_fixed_point_args args =
+  "(" ^ String.concat " ++ " args ^ " ++ argv)"
+
+(* is it good practice to overlaps scopes and hide variables like this? I think not *)
+let fpc_udef (head, body) =
+  let ((*name*)_, vars, args) = fpc_udef_head head in
+  let vars_str = fpc_var_existentials vars in
+  let args_str = fpc_fixed_point_args args in
+  let body_str = "body..." in
+  "(" ^ vars_str ^ " (and (eq Args " ^ args_str ^ ")\n" ^
+  body_str ^
+  "\n))"
+
+(* We aim for a local encoding that is as generic as possible and does not rely
+   on my coding conventions; this means that because argument matching will not
+   be refactored at the top by default, argument parsing structures will be
+   repeated in each clause. *)
+let rec fpc_udefs(*_exn*) = function
+  | [] -> failwith "empty udefs list"
+  | [hd] -> fpc_udef hd
+  | hd :: (hd' :: tl' as tl) -> "(or " ^ fpc_udef hd ^ "\n" ^ fpc_udefs tl ^ ")"
+
+(* Mutual recursion unsupported, note List.hd throws an exception! *)
+let fpc_define(*_exn*) idtys udefs =
+  let (name, _) = List.hd idtys in
+  "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
+  name ^ "(mu Pred\\Args\\\n" ^
+  fpc_udefs udefs ^
+  "\n)."
+
+let fpc_define2 idtys udefs =
   let fpc_id_ty (id, ty) = "(" ^ id ^ ", " ^ fpc_ty ty ^ ")" in
   let idtys_l = List.map fpc_id_ty idtys in
   let idtys_str = String.concat "+" idtys_l in
