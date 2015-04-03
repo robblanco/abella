@@ -34,6 +34,11 @@ open Printf
 open Accumulate
 (******************************************************************************)
 (*RB*)(*A translation module should be hack-added here*)
+
+(* TODO
+   - Substitute predicate names for logic variables and add their identification
+     with the corresponding generated fixed points. *)
+
 let fpc_ids ids =
   String.concat ", " ids
 
@@ -71,6 +76,8 @@ let fpc_restriction = ""
 (* 1. List.map2_exn *)
 
 (** ... Apparently I don't know how to pattern match the argument without a FUNCTION
+    TODO: detect unary constructors, as they challenge our current assumptions!!!
+          How to do this? We need to resort to a symbol table... so the choice is whether to make everything functional or resort to a constructive state. Abella chooses this latter option (cf. add_global_consts, pervasive_sr in prover.ml)... so we may as well try to re-use this
     @param umetaterm A left-degenerate binary tree consisting of a sequence of
                      UApp uterms. The deepest UApp is terminated on the right by
                      a UCon containing the name of the predicate. All are
@@ -150,19 +157,53 @@ let fpc_udef_head = function
   fpc_udef_head_rec uterm
 
 (* includes the final space! --- No more! *)
-let fpc_var_existentials vars =
+let fpc_var_quantification binder vars =
+  let fpc_binder = function (*Make this "nameless"?*)
+  | Forall -> "all"
+  | Exists -> "some"
+  | Nabla -> failwith "binder not supported"
+  in
+  let binder_str = fpc_binder binder in
   (*List.fold_left ~init:"" ~f:(fun acc var -> acc ^ "some " ^ var ^ "\\ ") vars*)
-  "some " ^ String.concat "\\ some " vars ^ "\\"
+  binder_str ^ " " ^ String.concat ("\\ " ^ binder_str ^ " ") vars ^ "\\" (*clarify expression*)
 
 let fpc_fixed_point_args args =
   "(" ^ String.concat " ++ " args ^ " ++ argv)"
 
+(** What do I need to return here? For starters, a string representation of the body
+    But later on too, a list of recursive predicates to be fetched according to naming conventions.
+    Or can I do it generically? How would I know otherwise? I haven't seen this in Abella... and with reason, as there the syntactic detour is not needed
+    Maybe to consider this a generic metaterm print predicate is better?
+    Some minor simplifications: if the whole body is TRUE, drop the clause, i.e. make it trivially true (in an OR context at least)
+    TODO: add binders *)
+let rec fpc_udef_body name = function
+  | UTrue -> "tt"
+  | UFalse -> "ff"
+  | UEq(t1, t2) -> "<eq>" (*TODO*)
+  | UArrow(umt1, umt2) ->
+    "(imp " ^ fpc_udef_body name umt1 ^ " " ^ fpc_udef_body name umt2 ^ ")"
+  | UBinding(b, idtys, umt) ->
+    let ids = List.map (fun (id, _) -> id) idtys in (* refactor? used elsewhere? *)
+    let ids_str = fpc_var_quantification b ids in
+    "(" ^ ids_str ^ " " ^ fpc_udef_body name umt ^ ")"
+  | UOr(umt1, umt2) ->
+    "(or "  ^ fpc_udef_body name umt1 ^ " " ^ fpc_udef_body name umt2 ^ ")"
+  | UAnd(umt1, umt2) ->
+    "(and " ^ fpc_udef_body name umt1 ^ " " ^ fpc_udef_body name umt2 ^ ")"
+  | UPred(_, _) as p ->
+    (* Seeing this, maybe I'll have to refactor, or rename, or re-something, fpc_udef_head, as well as the functions that conflate the parts *)
+    let (pred, _, args) = fpc_udef_head p in
+    let pred_rec = if pred = name then "Pred" else pred in
+    "(" ^ pred_rec ^ " " ^ fpc_fixed_point_args args ^ ")"
+  | UAsyncObj(_, _, _)|USyncObj(_, _, _, _) ->
+    failwith "umetaterm not supported"
+
 (* is it good practice to overlaps scopes and hide variables like this? I think not *)
 let fpc_udef (head, body) =
-  let ((*name*)_, vars, args) = fpc_udef_head head in
-  let vars_str = fpc_var_existentials vars in
+  let (name, vars, args) = fpc_udef_head head in
+  let vars_str = fpc_var_quantification Exists vars in
   let args_str = fpc_fixed_point_args args in
-  let body_str = "body..." in
+  let body_str = fpc_udef_body name body in
   "(" ^ vars_str ^ " (and (eq Args " ^ args_str ^ ")\n" ^
   body_str ^
   "\n))"
@@ -184,6 +225,7 @@ let fpc_define(*_exn*) idtys udefs =
   fpc_udefs udefs ^
   "\n)."
 
+(* This code is currently dead, but the fpc_umetaterm is relevant with some changes, cf. above *)
 let fpc_define2 idtys udefs =
   let fpc_id_ty (id, ty) = "(" ^ id ^ ", " ^ fpc_ty ty ^ ")" in
   let idtys_l = List.map fpc_id_ty idtys in
