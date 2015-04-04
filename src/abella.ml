@@ -464,20 +464,33 @@ let fpc_fixed_point_args = function
           it could be a bit more delicate than just doing it here. *)
 let rec fpc_udef_body name =
   (** Translation: predicate calls within the encoding of another predicate.
+      Self-references are made to 'Pred' as dictated by the encoding convention
+      (cf. fpc_define). References to other predicates are capitalized to
+      signify a logic variable that must be pre-loaded with the corresponding
+      fixed point of the predicate, which will be given the same name. As
+      identifiers cannot start with uppercase, these will be reserved for the
+      logic variables of same-named predicates. (Be careful with name clashes!)
       @param name Name of the predicate being encoded.
       @param pred Name of the predicate being called.
       @param args Arguments to the predicate being called.
       @return String representing the call to 'pred' with 'args' within the
               encoding of 'name'.
-      @author Rob Blanco *)
+      @author Rob Blanco
+      @todo To clarify where needed: variables may not be named after predicates
+            for this simple encoding to work.
+      @todo Also note that I am using this code for raw variables, too. Explain,
+            rename, adjust where appropriate. In particular, reuse in equality
+            makes me think that arguments may never apply (equality works on
+            terms, and though in Abella predicates are defined through similar
+            grammars, for me the context is different). *)
   let fpc_upred name pred args =
-    let pred_str = if pred = name then "Pred" else pred in
+    let pred_str = if pred = name then "Pred" else String.capitalize pred in
     "(" ^ pred_str ^ " " ^ fpc_fixed_point_args args ^ ")"
   (* fpc_udef_body *)
   in function
   | UTrue -> "tt"
   | UFalse -> "ff"
-  | UEq(t1, t2) ->
+  | UEq(t1, t2) -> (* This case may work, but it doesn't look clean at all *)
     let (pred1, _, args1) = fpc_udef_head_rec t1 in
     let (pred2, _, args2) = fpc_udef_head_rec t2 in
     let t1_str = fpc_upred name pred1 args1 in
@@ -499,6 +512,41 @@ let rec fpc_udef_body name =
   | UAsyncObj(_, _, _)|USyncObj(_, _, _, _) ->
     failwith "umetaterm not supported"
 
+(******************************************************************************)
+let rec preds = function
+  | UTrue|UFalse|UEq(_, _)                        -> []
+  | UArrow(mt1, mt2)|UOr(mt1, mt2)|UAnd(mt1, mt2) -> preds mt1 @ preds mt2
+  | UBinding(_, _, mt)                            -> preds mt
+  | UPred(_, _) as p                              -> [p]
+  | UAsyncObj(_, _, _)|USyncObj(_, _, _, _) -> failwith "metaterm not supported"
+
+(*name polymorphism?
+  also very important: when changing to FUNCTION, make sure to clean up the argument!*)
+let pred_name =
+  let rec pred_name_rec = function
+    | UApp(_, term_l, _) -> pred_name_rec term_l
+    | UCon(_, id, _) -> id
+    | _ -> failwith "term not supported"
+  in function
+  | UPred(term, _) -> pred_name_rec term
+  | _ -> failwith "not a predicate"
+
+let pred_fp name =
+  name ^ " " ^ String.capitalize name
+
+let sandwich left right str =
+  if String.length str = 0 then "" else left ^ str ^ right (*is_empty: Core*)
+
+let test_fun name body =
+  preds body |> 
+  List.map pred_name |>
+  List.filter (fun x -> String.compare x name <> 0) |>
+  List.map pred_fp |>
+  List.sort_uniq String.compare (*|>
+  String.concat " /\ " |>
+  sandwich ":= " "."*)
+(******************************************************************************)
+
 (** Translation: single clause in a predicate definition to (disjunctive) clause
     in the fixed point encoding.
     @param def Clause tuple consisting of two components: {ol
@@ -507,6 +555,7 @@ let rec fpc_udef_body name =
     @return String representation of the encoding of the clause.
     @raise On invalid structures including unsupported features.
     @author Rob Blanco *)
+(*A flexible idea: a category of functions "visit_predicates"... that take other functions instructing what to do with the selected nodes, so we may reuse and clarify things*)
 let fpc_udef (head, body) =
   let (name, vars, args) = fpc_udef_head head in
   let vars_str = fpc_var_quantification Exists vars in
@@ -540,6 +589,20 @@ let rec fpc_udefs(*_exn*) = function
   | [hd] -> fpc_udef hd
   | hd :: (hd' :: tl' as tl) -> "(or " ^ fpc_udef hd ^ "\n" ^ fpc_udefs tl ^ ")"
 
+(*maybe I'm repeating part of the processing that I did in test_fun... but does it make sense there?*)
+(*concat_map not defined outside Core*)
+let fpc_udefs_ext name udefs =
+  let wrap str =
+    if String.length str = 0
+    then ""
+    else "\n:=\n" ^ str
+  in
+  List.map (fun (_, body) -> test_fun name body) udefs |>
+  List.concat |>
+  List.sort_uniq String.compare |>
+  String.concat " /\ " |>
+  wrap
+
 (** Translation: inductive predicate to least fixed point.
     The function produces a left-associative chain of disjunctions, each leaf
     encoding one of the clauses of the predicate.
@@ -563,7 +626,9 @@ let fpc_define(*_exn*) udefs = function
     "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
     name ^ " (mu Pred\\Args\\\n" ^
     fpc_udefs udefs ^
-    "\n)."
+    "\n)" ^
+    fpc_udefs_ext name udefs ^
+    "."
 (*
   let (name, _) = List.hd idtys in
   "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
