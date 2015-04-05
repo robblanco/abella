@@ -262,9 +262,6 @@ let rec fpc_ty = function Ty(tys, id) ->
 (*************************
  * Interface with Abella *
  *************************)
-let fpc_theorem name thm =
-  fprintf stdout "FPC theorem"
-
 let rec fpc_uterm = function
   | UCon(pos, id, ty) -> "{Con/" ^ id ^ ", " ^ fpc_ty ty ^ "}"
   | ULam(pos, id, ty, uterm) -> "{Lam/" ^ id ^ ", " ^ fpc_ty ty ^ ", " ^ fpc_uterm uterm ^ "}"
@@ -637,6 +634,25 @@ let fpc_define(*_exn*) udefs = function
   "\n)."
 *)
 
+(* much of this can be refactored, see fpc_define ... *)
+let fpc_theorem_formula name thm =
+  "Define " ^ name ^ " : bool -> prop by\n" ^
+  name ^ " F :=\n" ^
+  fpc_udefs_ext name [(UTrue,thm)] (* there are some things to format there! *) ^  " /\ F =\n" ^
+  fpc_udef_body name thm ^ (* where is the name here? *)
+  "."
+
+let fpc_theorem name thm =
+  (* As nested functions?
+     1. Define formula predicate
+     2. Define prover predicate (we can include the certificate here and keep things simple)
+        - Allow all previously defined theorems as lemmas
+        - Provide a certificate
+     3. Define test *)
+  fpc_theorem_formula name thm (*^
+  fpc_theorem_proof name thm ^
+  fpc_theorem_check name*)
+
 let fpc_codefine idtys udefs =
   fprintf stdout "FPC codefine"
 
@@ -746,7 +762,7 @@ let import filename =
         List.iter
           (function
              | CTheorem(name, thm) ->
-                 fpc_theorem name thm ; (*RB*)
+                 (*fprintf stderr "%s" (fpc_theorem name (UTrue,thm)) ; *) (*RB*)
                  add_lemma name thm ;
              | CDefine(idtys, defs) ->
                  (*fpc_define defs idtys ;*) (*RB*)
@@ -993,7 +1009,7 @@ let rec process () =
       end ;
       begin match input with
         | Theorem(name, thm) ->
-            fpc_theorem name thm ; (*RB*)
+            fprintf stderr "%s" (fpc_theorem name thm) ; (*this is a horrible HACK!*) (*RB*)
             let thm = type_umetaterm ~sr:!sr ~sign:!sign thm in
               check_theorem thm ;
               theorem thm ;
