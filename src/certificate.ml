@@ -727,16 +727,17 @@ let describe_dependencies name defs =
     @todo Add support for mutual recursion.
     @todo Here and throughout, fix naming conventions to ignore 'u' prefixes,
           i.e. defs vs. udefs, etc. *)
-let describe_define defs = function
+let describe_fixed_point op defs = function
   | [] -> assert false
   | _ :: _ :: _ -> failwith "mutual recursion not supported"
   | (name, _) :: [] ->
     "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
-    name ^ " (mu Pred\\Args\\\n" ^
+    name ^ " (" ^ op ^ " Pred\\Args\\\n" ^
     describe_body defs ^
     "\n)" ^
     describe_dependencies name defs ^
     ".\n"
+
 (* New names
   fpc_udefs ->  define_descr_body
   fpc_udefs_ext -> define_descr_deps
@@ -748,6 +749,9 @@ let describe_define defs = function
   fpc_udefs udefs ^
   "\n)."
 *)
+
+let describe_define defs idtys = describe_fixed_point "mu" defs idtys
+let describe_codefine defs idtys = describe_fixed_point "nu" defs idtys
 
 (******************************************************************************)
 
