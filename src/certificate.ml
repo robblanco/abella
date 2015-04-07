@@ -62,6 +62,21 @@ let check_noredef ids =
         failwith "Predicate or constant already exists"
     ) ids
 
+type sign_type =
+  | Type
+  | Predicate
+  | Variable
+
+let check_id id =
+  let (_, ctable) = !sign in
+  try
+    let (_, Poly(_, Ty(_, ty))) = List.find (fun (name, _) -> name = id) ctable
+    in if ty = "prop"
+    then Predicate
+    else Type
+  with
+    Not_found -> Variable
+
 (*
 let rec fpc_uterm = function
   | UCon(pos, id, ty) -> "{Con/" ^ id ^ ", " ^ ty_descr ty ^ "}"
@@ -438,7 +453,11 @@ let rec parse_term =
     parse_arg_rec 0 uterm
   (* parse_head *)
   in *) function
-  | Var(v) -> Printf.sprintf "[Var %s]" v.name
+  | Var(v) ->
+    ( match check_id v.name with
+    | Type -> Printf.sprintf "[Var-Type %s]" v.name
+    | Predicate -> Printf.sprintf "[Var-Pred %s]" v.name
+    | Variable -> Printf.sprintf "[Var-Var %s]" v.name )
   | DB(i) -> Printf.sprintf "[DB %d]" i
   | Lam (tyctx, term) -> Printf.sprintf "[Lambda %s]" (parse_term term)
   | App (term, terms) ->
