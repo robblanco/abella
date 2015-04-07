@@ -389,7 +389,7 @@ let rec parse_term =
       @todo I had some notes here that I think have been taken proper care of.
             Consult if something goes wrong or greater generality is still
             needed. *)
-  let parse_arg uterm =
+  let parse_arg term =
     (** Translation: argument of a predicate call, recursive elaboration.
         Arguments to predicate calls are either monotype variables or, more
         generally, expressions involving monotype variables and monotype
@@ -403,7 +403,7 @@ let rec parse_term =
       (* An identifier at the top is a variable, at the bottom of a degenerate
          left chain it is a constructor that opens the string representation of
          the term. *)
-      | UCon(_, id, _) ->
+      | Var(var) ->
         (** Check if an identifier is already declared in Abella.
             Here we make use of the global state (i.e. the signature), which has
             led me to reposition the source code a bit, at least for now.
@@ -416,37 +416,37 @@ let rec parse_term =
         in
         (* parse_arg_rec *)
         if level = 0
-        then if fpc_declared_id id
-          then ([], id)
-          else ([id], id)
-        else ([], "(" ^ id)
+        then if fpc_declared_id var.name
+          then ([], var.name)
+          else ([var.name], var.name)
+        else ([], "(" ^ var.name)
       (* An application always consists of two parts: a left traversal of the
          degenerate tree with its previous arguments, if any, yielding an open
          (incomplete) term representation. This is the recursive part proper. On
          the right, the corresponding argument is parsed and added to the string
          representation. At the top of the chain, this closes the term. *)
-      | UApp(_, uterm_l, uterm_r) ->
+      | App(_, uterm_l, uterm_r) ->
         let (vars_l, arg_l) = parse_arg_rec (level + 1) uterm_l in
         let (vars_r, arg_r) = parse_arg_rec 0 uterm_r in
         let terminator = if level = 0 then ")" else "" in
         (vars_l @ vars_r, arg_l ^ " " ^ arg_r ^ terminator)
       (* Error *)
-      | ULam(_, _, _, _) -> failwith "uterm not supported"
+      | Lam(_,_,_,_)|DB(_)|Susp(_,_,_,_)|Ptr(_) -> failwith "term not supported"
     (* parse_arg *)
     in
     parse_arg_rec 0 uterm
   (* parse_head *)
   in function
   (* Base case: predicate name at the bottom on the left *)
-  | UCon(_, id, _) -> (id, [], [])
+  | Var(var) -> (var.name, [], [])
   (* Recursive case: process each argument *)
-  | UApp(_, uterm_l, uterm_r) ->
-      let (name, vars_l, args_l) = parse_term uterm_l in
-      let (vars_r, arg_r) = parse_arg uterm_r in
+  | App(_, term_l, term_r) ->
+      let (name, vars_l, args_l) = parse_term term_l in
+      let (vars_r, arg_r) = parse_arg term_r in
       let vars_uniq = List.sort_uniq String.compare (vars_l @ vars_r) in
       (name, vars_uniq, args_l @ [arg_r])
   (* Errors *)
-  | ULam(_, _, _, _) -> failwith "uterm not supported"
+  | Lam(_,_,_,_)|DB(_)|Susp(_,_,_,_)|Ptr(_) -> failwith "term not supported"
 
 (** Translation: decomposition of clause head for parameter mapping.
     This function is meant to be used on the head of a clause into the name of
@@ -485,11 +485,10 @@ let rec parse_term =
 (*TODO this must be generalized*)
 let parse_head = function
   (* Errors *)
-  | UTrue|UFalse|UEq (_, _)|UAsyncObj (_, _, _)|USyncObj (_, _, _, _)|
-    UArrow (_, _)|UBinding (_, _, _)|UOr (_, _)|UAnd (_, _) ->
-    failwith "umetaterm not supported"
+  | True|False|Eq(_,_)|Obj(_,_)|Arrow(_,_)|Binding(_,_,_)|Or(_,_)|And(_,_) ->
+    failwith "metaterm not supported"
   (* Treatment for predicates *)
-  | UPred(uterm, _) -> parse_term uterm
+  | Pred(term, _) -> parse_term term
 (******************************************************************************)
 
 (** Translation: quantify a set of variables.
@@ -530,29 +529,29 @@ let quantify binder =
           it could be a bit more delicate than just doing it here. *)
 let rec describe_metaterm name = function
   (* describe_metaterm *)
-  | UTrue -> "tt"
-  | UFalse -> "ff"
-  | UEq(t1, t2) -> (* This case may work, but it doesn't look clean at all *)
+  | True -> "tt"
+  | False -> "ff"
+  | Eq(t1, t2) -> (* This case may work, but it doesn't look clean at all *)
     let (pred1, _, args1) = parse_term t1 in
     let (pred2, _, args2) = parse_term t2 in
     let t1_str = describe_predicate name pred1 args1 in
     let t2_str = describe_predicate name pred2 args2 in
     "(eq " ^ t1_str ^ " " ^ t2_str ^ ")"
-  | UArrow(umt1, umt2) ->
-    "(imp " ^ describe_metaterm name umt1 ^ " " ^ describe_metaterm name umt2 ^ ")"
-  | UBinding(b, idtys, umt) ->
+  | Arrow(mt1, mt2) ->
+    "(imp " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
+  | Binding(b, idtys, mt) ->
     let ids = List.map (fun (id, _) -> id) idtys in (* Used elsewhere? *)
     let ids_str = quantify b ids in
-    "(" ^ ids_str ^ " " ^ describe_metaterm name umt ^ ")"
-  | UOr(umt1, umt2) ->
-    "(or "  ^ describe_metaterm name umt1 ^ " " ^ describe_metaterm name umt2 ^ ")"
-  | UAnd(umt1, umt2) ->
-    "(and " ^ describe_metaterm name umt1 ^ " " ^ describe_metaterm name umt2 ^ ")"
-  | UPred(_, _) as p ->
+    "(" ^ ids_str ^ " " ^ describe_metaterm name mt ^ ")"
+  | Or(mt1, mt2) ->
+    "(or "  ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
+  | And(mt1, mt2) ->
+    "(and " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
+  | Pred(_, _) as p ->
     let (pred, _, args) = parse_head p in
     describe_predicate name pred args
-  | UAsyncObj(_, _, _)|USyncObj(_, _, _, _) ->
-    failwith "umetaterm not supported"
+  | Obj(_, _) ->
+    failwith "metaterm not supported"
 
 let describe_body name body = describe_metaterm name body
 
@@ -647,11 +646,13 @@ let describe_body defs = describe_definitions defs
 
 
 let rec get_predicates = function
-  | UTrue|UFalse|UEq(_, _)                        -> []
-  | UArrow(mt1, mt2)|UOr(mt1, mt2)|UAnd(mt1, mt2) -> get_predicates mt1 @ get_predicates mt2
-  | UBinding(_, _, mt)                            -> get_predicates mt
-  | UPred(_, _) as p                              -> [p]
-  | UAsyncObj(_, _, _)|USyncObj(_, _, _, _) -> failwith "metaterm not supported"
+  | True|False|Eq(_, _) -> []
+  | Arrow(mt1, mt2)
+  | Or(mt1, mt2)
+  | And(mt1, mt2)       -> get_predicates mt1 @ get_predicates mt2
+  | Binding(_, _, mt)   -> get_predicates mt
+  | Pred(_, _) as p     -> [p]
+  | Obj(_, _)           -> failwith "metaterm not supported"
 
 (*name polymorphism?
   also very important: when changing to FUNCTION, make sure to clean up the argument!*)
@@ -661,7 +662,7 @@ let get_predicate_name =
     | UCon(_, id, _) -> id
     | _ -> failwith "term not supported"
   in function
-  | UPred(term, _) -> get_predicate_name_rec term
+  | Pred(term, _) -> get_predicate_name_rec term
   | _ -> failwith "not a predicate"
 
 let get_dependencies name defs =
@@ -754,15 +755,14 @@ let describe_define defs idtys = describe_fixed_point "mu" defs idtys
 let describe_codefine defs idtys = describe_fixed_point "nu" defs idtys
 
 (******************************************************************************)
+let append text file =
+  let oc = open_out_gen [Open_creat; Open_text; Open_append] 0o640 file in
+  output_string oc text ;
+  close_out oc
+(******************************************************************************)
 
-let ckind ids = describe_kind ids
-let ctype ids ty = describe_type ids ty
-let cdefine defs idtys = "cdefine"
-let ccodefine defs idtys = "ccodefine"
-let ctheorem id mterm = "ctheorem"
-
-let ikind ids = describe_kind ids
-let itype ids ty = describe_type ids ty
-let idefine udefs idtys = describe_define udefs idtys
-let icodefine udefs idtys = "icodefine"
-let itheorem id umterm = "itheorem"
+let ckind ids = append (describe_kind ids) "fpc-decl.mod"
+let ctype ids ty = append (describe_type ids ty) "fpc-decl.mod"
+let cdefine defs idtys = append (describe_define defs idtys) "fpc-decl.mod"
+let ccodefine defs idtys = append (describe_codefine defs idtys) "fpc-decl.mod"
+let ctheorem id mterm = append "ctheorem" "fpc-decl.mod"

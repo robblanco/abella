@@ -336,32 +336,32 @@ let import filename =
         List.iter
           (function
              | CTheorem(name, thm) ->
-                 (*fprintf stderr "%s" (fpc_theorem name (UTrue,thm)) ; *) (*RB*)
                  add_lemma name thm ;
+                 Certificate.ctheorem name thm ; (*RB*)
              | CDefine(idtys, defs) ->
-                 (*fpc_define defs idtys ;*) (*RB*)
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
                    add_global_consts idtys ;
                    add_defs ids Inductive defs ;
+                   Certificate.cdefine defs idtys ; (*RB*)
              | CCoDefine(idtys, defs) ->
-                 (*fpc_codefine idtys defs ;*) (*RB*)
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
                    add_global_consts idtys ;
-                   add_defs ids CoInductive defs
+                   add_defs ids CoInductive defs ;
+                   Certificate.ccodefine defs idtys ; (*RB*)
              | CImport(filename) ->
                  aux filename
              | CKind(ids) ->
-                 fprintf stderr "%s" (Certificate.ckind ids) ; (*RB*)
                  check_noredef ids;
-                 add_global_types ids
+                 add_global_types ids ;
+                 Certificate.ckind ids ; (*RB*)
              | CType(ids, ty) ->
-                 fprintf stderr "%s" (Certificate.ctype ids ty) ; (*RB*)
                  check_noredef ids;
-                 add_global_consts (List.map (fun id -> (id, ty)) ids)
+                 add_global_consts (List.map (fun id -> (id, ty)) ids) ;
+                 Certificate.ctype ids ty ; (*RB*)
              | CClose(ty_subords) ->
                  List.iter
                    (fun (ty, prev) ->
@@ -583,7 +583,6 @@ let rec process () =
       end ;
       begin match input with
         | Theorem(name, thm) ->
-            fprintf stderr "%s" (Certificate.itheorem name thm) ; (*this is a horrible HACK!*) (*RB*)
             let thm = type_umetaterm ~sr:!sr ~sign:!sign thm in
               check_theorem thm ;
               theorem thm ;
@@ -591,6 +590,7 @@ let rec process () =
                 process_proof name ;
                 compile (CTheorem(name, thm)) ;
                 add_lemma name thm ;
+                Certificate.ctheorem name thm ; (*RB*)
               with AbortProof -> () end
         | SSplit(name, names) ->
             let thms = create_split_theorems name names in
@@ -609,7 +609,8 @@ let rec process () =
                 check_defs ids defs ;
                 commit_global_consts local_sr local_sign ;
                 compile (CDefine(idtys, defs)) ;
-                add_defs ids Inductive defs
+                add_defs ids Inductive defs ;
+                Certificate.cdefine defs idtys ; (*RB*)
         | CoDefine(idtys, udefs) ->
             fprintf stderr "%s" (Certificate.icodefine udefs idtys) ; (*RB*)
             let ids = List.map fst idtys in
@@ -619,7 +620,8 @@ let rec process () =
                 check_defs ids defs ;
                 commit_global_consts local_sr local_sign ;
                 compile (CCoDefine(idtys, defs)) ;
-                add_defs ids CoInductive defs
+                add_defs ids CoInductive defs ;
+                Certificate.ccodefine defs idtys ; (*RB*)
         | TopCommon(Set(k, v)) ->
             set k v
         | TopCommon(Show(n)) ->
@@ -638,15 +640,15 @@ let rec process () =
                       \ at the begining of a development."
         | Query(q) -> query q
         | Kind(ids) ->
-            fprintf stderr "%s" (Certificate.ikind ids) ; (*RB*)
             check_noredef ids;
             add_global_types ids ;
-            compile (CKind ids)
+            compile (CKind ids) ;
+            Certificate.ckind ids ; (*RB*)
         | Type(ids, ty) ->
-            fprintf stderr "%s" (Certificate.itype ids ty) ; (*RB*)
             check_noredef ids;
             add_global_consts (List.map (fun id -> (id, ty)) ids) ;
             compile (CType(ids, ty))
+            Certificate.ctype ids ty ; (*RB*)
         | Close(ids) ->
             close_types ids ;
             compile
