@@ -576,7 +576,7 @@ let describe_type ids ty =
 
 
 (* Meta-level helpers *)
-let and_descriptions strs = String.concat " /\ " strs
+let and_descriptions strs = String.concat " /\\ " strs
 
 
 
@@ -798,12 +798,7 @@ let rec describe_definitions = function
 let describe_body defs = describe_definitions defs
 
 (* Refactor with theorem dependencies, consider duplicate steps *)
-let describe_dependencies name defs =
-  let decorate str =
-    if String.length str = 0
-    then ""
-    else "\n:=\n" ^ str
-  in
+let describe_dependencies name defs decorate =
   List.map (fun (_, body) -> body) defs |>
   get_dependencies name |>
   List.map describe_dependency |>
@@ -829,15 +824,40 @@ let describe_fixed_point op defs = function
   | [] -> assert false
   | _ :: _ :: _ -> failwith "mutual recursion not supported"
   | (name, _) :: [] ->
+    let decorate str =
+      if String.length str = 0
+      then ""
+      else "\n:=\n" ^ str
+    in
     "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
     name ^ " (" ^ op ^ " Pred\\Args\\\n" ^
     describe_body defs ^
     "\n)" ^
-    describe_dependencies name defs ^
+    describe_dependencies name defs decorate ^
     ".\n"
 
 let describe_define defs idtys = describe_fixed_point "mu" defs idtys
 let describe_codefine defs idtys = describe_fixed_point "nu" defs idtys
+
+(*******************************************************************************
+ * Theorems *
+ ************)
+
+(* about dependencies: recursion is irrelevant, make name optional
+   moreover, adapt interface *)
+let describe_theorem name thm =
+  let decorate str =
+    if String.length str = 0
+    then ""
+    else  str ^ " /\\ "
+  in
+  let thm_str = describe_metaterm "" thm in
+  let deps_str = describe_dependencies "" [(True, thm)] decorate in (*this points to a refactoring task to get dependencies to work on metaterms, then extending that to def pairs*)
+  "Define " ^ name ^ " : bool -> prop by\n" ^
+  name ^ " F :=\n" ^
+  deps_str ^  "F =\n" ^
+  thm_str ^ (* where is the name here? *)
+  ".\n"
 
 (*******************************************************************************
  * Output file manipulation *
@@ -856,4 +876,4 @@ let ckind ids = append (describe_kind ids) "fpc-decl.mod"
 let ctype ids ty = append (describe_type ids ty) "fpc-decl.mod"
 let cdefine defs idtys = append (describe_define defs idtys) "fpc-decl.mod"
 let ccodefine defs idtys = append (describe_codefine defs idtys) "fpc-decl.mod"
-let ctheorem id mterm = append "ctheorem" "fpc-decl.mod"
+let ctheorem id mterm = append (describe_theorem id mterm) "fpc-decl.mod"
