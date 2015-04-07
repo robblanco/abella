@@ -586,6 +586,88 @@ let rec describe_metaterm name = function
   | Obj(_, _) ->
     failwith "metaterm not supported"
 
+(******************************************************************************)
+
+(*********
+ * Kinds *
+ *********)
+
+let describe_kind ids = "" (* Everything will be transparently 'i'-typed *)
+
+(******************************************************************************)
+
+(*********
+ * Types *
+ *********)
+
+let describe_ids ids =
+  String.concat ", " ids
+
+let rec describe_ty = function Ty(tys, id) ->
+  let tys_str = List.map describe_ty tys |> String.concat " -> " in
+  match tys with
+  | []          ->                             id (* Simple type *)
+  | [_]         -> "( " ^ tys_str ^ " ) -> " ^ id (* Left-associative *)
+  | _ :: _ :: _ ->        tys_str ^   " -> " ^ id (* Right-associative *)
+
+let describe_type ids ty =
+  let ids_str = describe_ids ids in
+  let ty_str = describe_ty ty in
+  "Type " ^ ids_str ^ " " ^ ty_str ^ ".\n"
+
+
+
+
+
+(* Meta-level helpers *)
+let and_descriptions strs = String.concat " /\ " strs
+
+
+
+
+
+let rec get_predicates = function
+  | True|False|Eq(_, _) -> []
+  | Arrow(mt1, mt2)
+  | Or(mt1, mt2)
+  | And(mt1, mt2)       -> get_predicates mt1 @ get_predicates mt2
+  | Binding(_, _, mt)   -> get_predicates mt
+  | Pred(_, _) as p     -> [p]
+  | Obj(_, _)           -> failwith "metaterm not supported"
+
+(*name polymorphism?
+  also very important: when changing to FUNCTION, make sure to clean up the argument!
+  note that we can nest "sparse" mattern matches easily! nice *)
+let get_predicate_name = function
+  | Pred(App((Ptr(_) as ptr), _), _) ->
+    let var = observe ptr in
+    ( match var with
+    | Var id ->
+      if check_id id.name = Predicate
+      then id.name
+      else failwith "not a predicate"
+    | _ -> failwith "bad observation" )
+  | _ -> failwith "bad predicate"
+
+(*******************************************************************************
+ * Dependencies on external predicates *
+ ***************************************)
+
+(* Meta-level enumeration *)
+let describe_dependency id = id ^ " " ^ String.capitalize id
+
+let get_dependencies name defs =
+  List.map get_predicates defs |>
+  List.concat |>
+  List.map get_predicate_name |>
+  List.filter (fun x -> String.compare x name <> 0) |>
+  List.sort_uniq String.compare
+
+(*******************************************************************************
+ * (Co)inductive definitions *
+ *****************************)
+
+(* Another wrapper (I'm working upwards, so the order reads wrong)*)
 let describe_body name body = describe_metaterm name body
 
 (** Translation: single clause in a predicate definition to (disjunctive) clause
@@ -631,108 +713,10 @@ let rec describe_definitions = function
   | hd :: (hd' :: tl' as tl) ->
     "(or " ^ describe_definition hd ^ "\n" ^ describe_definitions tl ^ ")"
 
-(******************************************************************************)
-
-(*********
- * Kinds *
- *********)
-
-let describe_kind ids = "" (* Everything will be transparently 'i'-typed *)
-
-(******************************************************************************)
-
-(*********
- * Types *
- *********)
-
-let describe_ids ids =
-  String.concat ", " ids
-
-let rec describe_ty = function Ty(tys, id) ->
-  let tys_str = List.map describe_ty tys |> String.concat " -> " in
-  match tys with
-  | []          ->                             id (* Simple type *)
-  | [_]         -> "( " ^ tys_str ^ " ) -> " ^ id (* Left-associative *)
-  | _ :: _ :: _ ->        tys_str ^   " -> " ^ id (* Right-associative *)
-
-let describe_type ids ty =
-  let ids_str = describe_ids ids in
-  let ty_str = describe_ty ty in
-  "Type " ^ ids_str ^ " " ^ ty_str ^ ".\n"
-
-(******************************************************************************)
-
-
-
-(*************************
- * Inductive definitions *
- *************************)
-
-let describe_dependency id = id ^ " " ^ String.capitalize id
-let and_descriptions strs = String.concat " /\ " strs
- 
+(* just a wrapper for the propertly-named function... *)
 let describe_body defs = describe_definitions defs
 
-
-
-
-
-
-let rec get_predicates = function
-  | True|False|Eq(_, _) -> []
-  | Arrow(mt1, mt2)
-  | Or(mt1, mt2)
-  | And(mt1, mt2)       -> get_predicates mt1 @ get_predicates mt2
-  | Binding(_, _, mt)   -> get_predicates mt
-  | Pred(_, _) as p     -> [p]
-  | Obj(_, _)           -> failwith "metaterm not supported"
-
-(*name polymorphism?
-  also very important: when changing to FUNCTION, make sure to clean up the argument!*)
-let get_predicate_name =
-  (*let rec get_predicate_name_rec = function
-    | UApp(_, term_l, _) -> get_predicate_name_rec term_l
-    | UCon(_, id, _) -> id
-    | _ -> failwith "term not supported"
-  in*) function
-  | Pred(term, _) -> (*get_predicate_name_rec term*)"Calimero"
-  | _ -> failwith "not a predicate"
-
-let get_dependencies name defs =
-  (*List.concat_map get_predicates defs |> *)
-  List.map get_predicates defs |>
-  List.concat |>
-  List.map get_predicate_name |>
-  List.filter (fun x -> String.compare x name <> 0) |>
-(*  List.map describe_predicate_name |> *)
-  List.sort_uniq String.compare (*|>
-  String.concat " /\ " |>
-  sandwich ":= " "."*)
-
-(*
-let fpc_udefs_ext name defs =
-  let decorate str =
-    if String.length str = 0
-    then ""
-    else "\n:=\n" ^ str
-  in
-(*  List.map (fun (_, body) -> test_fun name body) udefs |> *)
-  List.map (fun (_, body) -> body) defs |>
-  get_dependencies name |>
-(*  List.concat |>
-  List.sort_uniq String.compare |> *)
-  List.map describe_dependency |>
-  and_descriptions |>
-  decorate
-
-(*let get_dependencies name defs = []*)
-*)
-
-
-
-
-
-
+(* Refactor with theorem dependencies, consider duplicate steps *)
 let describe_dependencies name defs =
   let decorate str =
     if String.length str = 0
@@ -748,19 +732,18 @@ let describe_dependencies name defs =
 (** Translation: inductive predicate to least fixed point.
     The function produces a left-associative chain of disjunctions, each leaf
     encoding one of the clauses of the predicate.
-    @param udefs List of predicate definitions in ordered, one-to-one
+    @param op String representation of fixed point type to be translated.
+    @param defs List of predicate definitions in ordered, one-to-one
                  correspondence with the elements of 'idtys'.
     @param idtys List of tuples containing the names and types of the
                  predicates involved in the definition.
-    @return String encoding a least fixed point that represents the predicate of
-            the definition.
+    @return String encoding of fixed point representing the predicate given by
+            the definitions.
     @raise Mutually recursive definitions and definitions involving
            unsupported features. Possibly invalid structures, but without any
            guarantees (an error-free Abella parse tree is assumed).
     @author Rob Blanco
-    @todo Add support for mutual recursion.
-    @todo Here and throughout, fix naming conventions to ignore 'u' prefixes,
-          i.e. defs vs. udefs, etc. *)
+    @todo Add support for mutual recursion. *)
 let describe_fixed_point op defs = function
   | [] -> assert false
   | _ :: _ :: _ -> failwith "mutual recursion not supported"
@@ -772,27 +755,21 @@ let describe_fixed_point op defs = function
     describe_dependencies name defs ^
     ".\n"
 
-(* New names
-  fpc_udefs ->  define_descr_body
-  fpc_udefs_ext -> define_descr_deps
-  These are udefs, but I'll name them defs and translate... *)
-(*
-  let (name, _) = List.hd idtys in
-  "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
-  name ^ " (mu Pred\\Args\\\n" ^
-  fpc_udefs udefs ^
-  "\n)."
-*)
-
 let describe_define defs idtys = describe_fixed_point "mu" defs idtys
 let describe_codefine defs idtys = describe_fixed_point "nu" defs idtys
 
-(******************************************************************************)
+(*******************************************************************************
+ * Output file manipulation *
+ ****************************)
+
 let append text file =
   let oc = open_out_gen [Open_creat; Open_text; Open_append] 0o640 file in
   output_string oc text ;
   close_out oc
-(******************************************************************************)
+
+(*******************************************************************************
+ * Module interface *
+ ********************)
 
 let ckind ids = append (describe_kind ids) "fpc-decl.mod"
 let ctype ids ty = append (describe_type ids ty) "fpc-decl.mod"
