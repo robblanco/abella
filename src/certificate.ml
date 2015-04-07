@@ -389,6 +389,7 @@ let rec parse_term =
       @todo I had some notes here that I think have been taken proper care of.
             Consult if something goes wrong or greater generality is still
             needed. *)
+(*
   let parse_arg term =
     (** Translation: argument of a predicate call, recursive elaboration.
         Arguments to predicate calls are either monotype variables or, more
@@ -436,7 +437,17 @@ let rec parse_term =
     in
     parse_arg_rec 0 uterm
   (* parse_head *)
-  in function
+  in *) function
+  | Var(v) -> Printf.sprintf "[Var %s]" v.name
+  | DB(i) -> Printf.sprintf "[DB %d]" i
+  | Lam (tyctx, term) -> Printf.sprintf "[Lambda %s]" (parse_term term)
+  | App (term, terms) ->
+    let term_str = parse_term term in
+    let terms_str = List.map parse_term terms |> String.concat " ; " in
+    Printf.sprintf "[App %s {%s}]" term_str terms_str
+  | Susp(term, _, _, _) -> Printf.sprintf "[Susp %s]" (parse_term term)
+  | Ptr p as t -> Printf.sprintf "[Ptr %s]" (parse_term (observe t))
+  (**  
   (* Base case: predicate name at the bottom on the left *)
   | Var(var) -> (var.name, [], [])
   (* Recursive case: process each argument *)
@@ -447,6 +458,7 @@ let rec parse_term =
       (name, vars_uniq, args_l @ [arg_r])
   (* Errors *)
   | Lam(_,_,_,_)|DB(_)|Susp(_,_,_,_)|Ptr(_) -> failwith "term not supported"
+**)
 
 (** Translation: decomposition of clause head for parameter mapping.
     This function is meant to be used on the head of a clause into the name of
@@ -532,10 +544,12 @@ let rec describe_metaterm name = function
   | True -> "tt"
   | False -> "ff"
   | Eq(t1, t2) -> (* This case may work, but it doesn't look clean at all *)
+(*
     let (pred1, _, args1) = parse_term t1 in
     let (pred2, _, args2) = parse_term t2 in
     let t1_str = describe_predicate name pred1 args1 in
     let t2_str = describe_predicate name pred2 args2 in
+*) let t1_str = parse_term t1 in let t2_str = parse_term t2 in
     "(eq " ^ t1_str ^ " " ^ t2_str ^ ")"
   | Arrow(mt1, mt2) ->
     "(imp " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
@@ -548,8 +562,8 @@ let rec describe_metaterm name = function
   | And(mt1, mt2) ->
     "(and " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
   | Pred(_, _) as p ->
-    let (pred, _, args) = parse_head p in
-    describe_predicate name pred args
+    (*let (pred, _, args) =*) parse_head p (*in
+    describe_predicate name pred args*)
   | Obj(_, _) ->
     failwith "metaterm not supported"
 
@@ -565,11 +579,11 @@ let describe_body name body = describe_metaterm name body
     @author Rob Blanco *)
 (*A flexible idea: a category of functions "visit_predicates"... that take other functions instructing what to do with the selected nodes, so we may reuse and clarify things*)
 let describe_definition (head, body) =
-  let (name, vars, args) = parse_head head in
-  let vars_str = quantify Exists vars in
-  let args_str = describe_arguments args in
-  let body_str = describe_body name body in
-  "(" ^ vars_str ^ " (and (eq Args " ^ args_str ^ ")\n" ^
+  let (*name, vars, args*)temp_str = parse_head head in
+  (*let vars_str = quantify Exists vars in
+  let args_str = describe_arguments args in*)
+  let body_str = describe_body (*name*)"dummy" body in
+  (*"(" ^ vars_str ^ " (and (eq Args " ^ args_str ^ ")\n"*) temp_str ^
   body_str ^
   "\n))"
 
@@ -657,12 +671,12 @@ let rec get_predicates = function
 (*name polymorphism?
   also very important: when changing to FUNCTION, make sure to clean up the argument!*)
 let get_predicate_name =
-  let rec get_predicate_name_rec = function
+  (*let rec get_predicate_name_rec = function
     | UApp(_, term_l, _) -> get_predicate_name_rec term_l
     | UCon(_, id, _) -> id
     | _ -> failwith "term not supported"
-  in function
-  | Pred(term, _) -> get_predicate_name_rec term
+  in*) function
+  | Pred(term, _) -> (*get_predicate_name_rec term*)"Calimero"
   | _ -> failwith "not a predicate"
 
 let get_dependencies name defs =

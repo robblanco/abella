@@ -601,7 +601,6 @@ let rec process () =
                    compile (CTheorem(n, t)))
                 thms ;
         | Define(idtys, udefs) ->
-            fprintf stderr "%s" (Certificate.idefine udefs idtys) ; (*RB*)
             let ids = List.map fst idtys in
               check_noredef ids;
               let (local_sr, local_sign) = locally_add_global_consts idtys in
@@ -612,7 +611,6 @@ let rec process () =
                 add_defs ids Inductive defs ;
                 Certificate.cdefine defs idtys ; (*RB*)
         | CoDefine(idtys, udefs) ->
-            fprintf stderr "%s" (Certificate.icodefine udefs idtys) ; (*RB*)
             let ids = List.map fst idtys in
               check_noredef ids;
               let (local_sr, local_sign) = locally_add_global_consts idtys in
@@ -647,7 +645,7 @@ let rec process () =
         | Type(ids, ty) ->
             check_noredef ids;
             add_global_consts (List.map (fun id -> (id, ty)) ids) ;
-            compile (CType(ids, ty))
+            compile (CType(ids, ty)) ;
             Certificate.ctype ids ty ; (*RB*)
         | Close(ids) ->
             close_types ids ;
