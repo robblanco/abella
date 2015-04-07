@@ -335,42 +335,6 @@ let test_fun name body =
 *)
 (******************************************************************************)
 
-(** Translation: arguments of a fixed point expression.
-    Predicates are encoded through fixed points in the checker. All fixed points
-    have a single argument that can be used to encode arbitrary lists of
-    parameters through the list constructors 'argv' and '(++)'.
-    @param args List of strings representing arguments passed to a predicate.
-    @return String representing the single argument for the fixed point that
-            translates the original predicate.
-    @author Rob Blanco *)
-let describe_arguments = function
-  | [] -> "argv"
-  | (hd :: tl) as args -> "(" ^ String.concat " ++ " args ^ " ++ argv)"
-
-(** Translation: predicate calls within the encoding of another predicate.
-      Self-references are made to 'Pred' as dictated by the encoding convention
-      (cf. define_descr). References to other predicates are capitalized to
-      signify a logic variable that must be pre-loaded with the corresponding
-      fixed point of the predicate, which will be given the same name. As
-      identifiers cannot start with uppercase, these will be reserved for the
-      logic variables of same-named predicates. (Be careful with name clashes!)
-      @param name Name of the predicate being encoded.
-      @param pred Name of the predicate being called.
-      @param args Arguments to the predicate being called.
-      @return String representing the call to 'pred' with 'args' within the
-              encoding of 'name'.
-      @author Rob Blanco
-      @todo To clarify where needed: variables may not be named after predicates
-            for this simple encoding to work.
-      @todo Also note that I am using this code for raw variables, too. Explain,
-            rename, adjust where appropriate. In particular, reuse in equality
-            makes me think that arguments may never apply (equality works on
-            terms, and though in Abella predicates are defined through similar
-            grammars, for me the context is different). *)
-let describe_predicate name pred args =
-  let pred_str = if pred = name then "Pred" else String.capitalize pred in
-  "(" ^ pred_str ^ " " ^ describe_arguments args ^ ")"
-
 (***************
  * Definitions *
  ***************)
@@ -395,6 +359,9 @@ let describe_predicate name pred args =
           is that because atoms "are" predicates/fixed points in the current
           context, this will work well with little extra attention. Consider,
           however, the case of variables. *)
+(*TODO this is now more general and has a HEAD which can be of several types!!!
+  TODO add support for lambda
+  TODO refactor the ptr-var treatmant somehow *)
 let rec parse_term =
   (** Translation: argument of a predicate call.
       @param uterm Term representing an argument in a predicate call.
@@ -466,18 +433,53 @@ let rec parse_term =
     Printf.sprintf "[App %s {%s}]" term_str terms_str
   | Susp(term, _, _, _) -> Printf.sprintf "[Susp %s]" (parse_term term)
   | Ptr p as t -> Printf.sprintf "[Ptr %s]" (parse_term (observe t))
-  (**  
-  (* Base case: predicate name at the bottom on the left *)
-  | Var(var) -> (var.name, [], [])
-  (* Recursive case: process each argument *)
-  | App(_, term_l, term_r) ->
-      let (name, vars_l, args_l) = parse_term term_l in
-      let (vars_r, arg_r) = parse_arg term_r in
-      let vars_uniq = List.sort_uniq String.compare (vars_l @ vars_r) in
-      (name, vars_uniq, args_l @ [arg_r])
+(*  
+  let parse_name = function
+    | Ptr(_) as ptr -> let var = observe ptr in
+      ( match var with
+      | Var id -> id.name
+      | _ -> failwith "bad pointer-var format" )
+    | _ -> failwith "not a name pointer"
+  in
+  
+  let parse_arg = function
+    | Ptr(_) as ptr -> let var = observe ptr in
+      ( match var with
+      | Var id -> id.name
+      | _ -> failwith "bad pointer-var format" )
+    |
+    |
+
+  (* Base case: single core *)
+  | Ptr _ as ptr ->
+    let name = parse_name in
+    (head, [], [])
+  (* Recursive case: head and arguments *)
+  (*now the recursion is just a cheat to re-use the ptr-var code for variables and constructors, and should be cleaned up and refactored, as indicated above, and recursion eliminated - or is it a bit deeper?*)
+  | App(name, args) ->
+      let name_str = parse_name name in
+      let varargs_str = List.map parse_arg args in
+      let vars_str = List.map fst varargs_str |> List.sort_uniq String.compare in
+      let args_str = List.map snd varargs_str in
+      (name_str, vars_str, args_str)
   (* Errors *)
-  | Lam(_,_,_,_)|DB(_)|Susp(_,_,_,_)|Ptr(_) -> failwith "term not supported"
-**)
+  | App(_, _) -> "bad application"
+  | DB(_)|Lam (_,_)|Susp(_,_,_,_) -> failwith "term not supported"
+*)
+
+(*name polymorphism?
+  also very important: when changing to FUNCTION, make sure to clean up the argument!
+  note that we can nest "sparse" mattern matches easily! nice *)
+let get_predicate_name = function
+  | Pred(App((Ptr(_) as ptr), _), _) ->
+    let var = observe ptr in
+    ( match var with
+    | Var id ->
+      if check_id id.name = Predicate
+      then id.name
+      else failwith "not a predicate"
+    | _ -> failwith "bad observation" )
+  | _ -> failwith "bad predicate"
 
 (** Translation: decomposition of clause head for parameter mapping.
     This function is meant to be used on the head of a clause into the name of
@@ -540,52 +542,6 @@ let quantify binder =
     List.fold_left (fun acc var -> acc ^ binder_str ^ " " ^ var ^ "\\ ") "" vars
     |> String.trim
 
-(** Translation: body of a clause.
-    @param name Name of the predicate being translated.
-    @param umetaterm (Sub-)term representing a clause or part thereof.
-    @return String representation of the term 'umetaterm' where according to
-            encoding conventions recursive references to the predicate being
-            considered ('name') are given the canonical self-reference 'Pred'.
-    @raise On unsupported terms.
-    @author Rob Blanco
-    @todo Return list of references to other predicates for external linking.
-          Can I do it generically? In Abella the syntactic detour is not needed.
-    @todo In the predicate case, maybe need to refactor, rename, re-something,
-          fpc_udef_head, as well as the functions that conflate the parts.
-    @todo The function name is unfortunate, so appears to be fpc_udef_head_rec,
-          which is apparently never called recursively outside itself.
-    @todo Can we consider a generic print_metaterm as a better alternative?
-    @todo Minor simplifications: if the body is trivially true, drop the clause
-          (at least in a disjunctive context). Recall that this is recursive, so
-          it could be a bit more delicate than just doing it here. *)
-let rec describe_metaterm name = function
-  (* describe_metaterm *)
-  | True -> "tt"
-  | False -> "ff"
-  | Eq(t1, t2) -> (* This case may work, but it doesn't look clean at all *)
-(*
-    let (pred1, _, args1) = parse_term t1 in
-    let (pred2, _, args2) = parse_term t2 in
-    let t1_str = describe_predicate name pred1 args1 in
-    let t2_str = describe_predicate name pred2 args2 in
-*) let t1_str = parse_term t1 in let t2_str = parse_term t2 in
-    "(eq " ^ t1_str ^ " " ^ t2_str ^ ")"
-  | Arrow(mt1, mt2) ->
-    "(imp " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
-  | Binding(b, idtys, mt) ->
-    let ids = List.map (fun (id, _) -> id) idtys in (* Used elsewhere? *)
-    let ids_str = quantify b ids in
-    "(" ^ ids_str ^ " " ^ describe_metaterm name mt ^ ")"
-  | Or(mt1, mt2) ->
-    "(or "  ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
-  | And(mt1, mt2) ->
-    "(and " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
-  | Pred(_, _) as p ->
-    (*let (pred, _, args) =*) parse_head p (*in
-    describe_predicate name pred args*)
-  | Obj(_, _) ->
-    failwith "metaterm not supported"
-
 (******************************************************************************)
 
 (*********
@@ -635,20 +591,6 @@ let rec get_predicates = function
   | Pred(_, _) as p     -> [p]
   | Obj(_, _)           -> failwith "metaterm not supported"
 
-(*name polymorphism?
-  also very important: when changing to FUNCTION, make sure to clean up the argument!
-  note that we can nest "sparse" mattern matches easily! nice *)
-let get_predicate_name = function
-  | Pred(App((Ptr(_) as ptr), _), _) ->
-    let var = observe ptr in
-    ( match var with
-    | Var id ->
-      if check_id id.name = Predicate
-      then id.name
-      else failwith "not a predicate"
-    | _ -> failwith "bad observation" )
-  | _ -> failwith "bad predicate"
-
 (*******************************************************************************
  * Dependencies on external predicates *
  ***************************************)
@@ -667,6 +609,143 @@ let get_dependencies name defs =
  * (Co)inductive definitions *
  *****************************)
 
+
+let rec get_term_variables = function
+  | Var(id) ->
+    if check_id id.name = Variable
+    then [id.name]
+    else []
+  | App(_, args) -> (*assuming that the name is well constructed, it cannot be a variable*)
+    List.map get_term_variables args |>
+    List.concat |>
+    List.sort_uniq String.compare
+  | Ptr(_) as ptr ->
+    let var = observe ptr in
+    get_term_variables var
+  | DB(_) | Lam(_, _) | Susp(_, _, _, _) -> failwith "term not supported"
+
+let rec get_metaterm_variables = function
+  | True -> []
+  | False -> []
+  | Eq(t1, t2) ->
+    List.sort_uniq String.compare (get_term_variables t1 @ get_term_variables t2)
+  | Arrow(mt1, mt2)
+  | Or(mt1, mt2)
+  | And(mt1, mt2) ->
+    List.sort_uniq compare (get_metaterm_variables mt1 @ get_metaterm_variables mt2)
+  | Binding(_, _, mt) ->
+    List.sort compare (get_metaterm_variables mt) (*make sure that the binders are not included!*)
+  | Pred(t, _) ->
+    List.sort compare (get_term_variables t)
+  | Obj(_, _) -> failwith "metaterm not supported"
+
+let rec describe_term = function
+  | Var(id) -> id.name
+  | App(name, args) ->
+    let name_str = describe_term name in
+    let args_str = List.map describe_term args |> String.concat " " in
+    "(" ^ name_str ^ " " ^ args_str ^ ")"
+  | Ptr(_) as ptr ->
+    let var = observe ptr in
+    describe_term var
+  | DB(_) | Lam(_, _) | Susp(_, _, _, _) -> failwith "term not supported"
+
+let get_predicate_arguments = function
+  | Pred(App(_, args) ,_) ->
+    List.map describe_term args
+  | _ -> failwith "not a predicate or bad format"
+
+(** Translation: arguments of a fixed point expression.
+    Predicates are encoded through fixed points in the checker. All fixed points
+    have a single argument that can be used to encode arbitrary lists of
+    parameters through the list constructors 'argv' and '(++)'.
+    @param args List of strings representing arguments passed to a predicate.
+    @return String representing the single argument for the fixed point that
+            translates the original predicate.
+    @author Rob Blanco *)
+let describe_arguments = function
+  | [] -> "argv"
+  | (hd :: tl) as args -> "(" ^ String.concat " ++ " args ^ " ++ argv)"
+
+(** Translation: predicate calls within the encoding of another predicate.
+      Self-references are made to 'Pred' as dictated by the encoding convention
+      (cf. define_descr). References to other predicates are capitalized to
+      signify a logic variable that must be pre-loaded with the corresponding
+      fixed point of the predicate, which will be given the same name. As
+      identifiers cannot start with uppercase, these will be reserved for the
+      logic variables of same-named predicates. (Be careful with name clashes!)
+      @param name Name of the predicate being encoded.
+      @param pred Name of the predicate being called.
+      @param args Arguments to the predicate being called.
+      @return String representing the call to 'pred' with 'args' within the
+              encoding of 'name'.
+      @author Rob Blanco
+      @todo To clarify where needed: variables may not be named after predicates
+            for this simple encoding to work.
+      @todo Also note that I am using this code for raw variables, too. Explain,
+            rename, adjust where appropriate. In particular, reuse in equality
+            makes me think that arguments may never apply (equality works on
+            terms, and though in Abella predicates are defined through similar
+            grammars, for me the context is different). *)
+(*compare with describe_definition*)
+let describe_predicate global_name = function
+  | Pred(_, _) as pred ->
+    let name = get_predicate_name pred in
+    let args = get_predicate_arguments pred in
+    let name_str = if name = global_name then "Pred" else String.capitalize name in
+    let args_str = describe_arguments args in
+    "(" ^ name_str ^ " " ^ args_str  ^ ")"
+  | _ -> failwith "not a predicate"
+
+(** Translation: body of a clause.
+    @param name Name of the predicate being translated.
+    @param umetaterm (Sub-)term representing a clause or part thereof.
+    @return String representation of the term 'umetaterm' where according to
+            encoding conventions recursive references to the predicate being
+            considered ('name') are given the canonical self-reference 'Pred'.
+    @raise On unsupported terms.
+    @author Rob Blanco
+    @todo Return list of references to other predicates for external linking.
+          Can I do it generically? In Abella the syntactic detour is not needed.
+    @todo In the predicate case, maybe need to refactor, rename, re-something,
+          fpc_udef_head, as well as the functions that conflate the parts.
+    @todo The function name is unfortunate, so appears to be fpc_udef_head_rec,
+          which is apparently never called recursively outside itself.
+    @todo Can we consider a generic print_metaterm as a better alternative?
+    @todo Minor simplifications: if the body is trivially true, drop the clause
+          (at least in a disjunctive context). Recall that this is recursive, so
+          it could be a bit more delicate than just doing it here. *)
+(*all this can probably be refactored, think meta vs. object level
+  also refactor binary operators, which is probably the basis of meta-object refactoring*)
+let rec describe_metaterm name = function
+  (* describe_metaterm *)
+  | True -> "tt"
+  | False -> "ff"
+  | Eq(t1, t2) -> (* This case may work, but it doesn't look clean at all *)
+(*
+    let (pred1, _, args1) = parse_term t1 in
+    let (pred2, _, args2) = parse_term t2 in
+    let t1_str = describe_predicate name pred1 args1 in
+    let t2_str = describe_predicate name pred2 args2 in
+ let t1_str = parse_term t1 in let t2_str = parse_term t2 in*)
+    "(eq " ^ describe_term t1 ^ " " ^ describe_term t2 ^ ")"
+  | Arrow(mt1, mt2) ->
+    "(imp " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
+  | Binding(b, idtys, mt) ->
+    let ids = List.map (fun (id, _) -> id) idtys in (* Used elsewhere? *)
+    let ids_str = quantify b ids in
+    "(" ^ ids_str ^ " " ^ describe_metaterm name mt ^ ")"
+  | Or(mt1, mt2) ->
+    "(or "  ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
+  | And(mt1, mt2) ->
+    "(and " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
+  | Pred(_, _) as p ->
+    describe_predicate name p
+    (*let (pred, _, args) = parse_head p in
+    describe_predicate name pred args*)
+  | Obj(_, _) ->
+    failwith "metaterm not supported"
+
 (* Another wrapper (I'm working upwards, so the order reads wrong)*)
 let describe_body name body = describe_metaterm name body
 
@@ -680,11 +759,13 @@ let describe_body name body = describe_metaterm name body
     @author Rob Blanco *)
 (*A flexible idea: a category of functions "visit_predicates"... that take other functions instructing what to do with the selected nodes, so we may reuse and clarify things*)
 let describe_definition (head, body) =
-  let (*name, vars, args*)temp_str = parse_head head in
-  (*let vars_str = quantify Exists vars in
-  let args_str = describe_arguments args in*)
-  let body_str = describe_body (*name*)"dummy" body in
-  (*"(" ^ vars_str ^ " (and (eq Args " ^ args_str ^ ")\n"*) temp_str ^
+  let name = get_predicate_name head in
+  let vars = get_metaterm_variables head in
+  let args = get_predicate_arguments head in
+  let vars_str = quantify Exists vars in
+  let args_str = describe_arguments args in
+  let body_str = describe_body name body in
+  "(" ^ vars_str ^ " (and (eq Args " ^ args_str ^ ")\n" ^
   body_str ^
   "\n))"
 
