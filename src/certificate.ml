@@ -1,92 +1,9 @@
-(*
-(******************************************************************************)
-(*RB*)(*A translation module should be hack-added here*)
-
-(* TODO
-   - Substitute predicate names for logic variables and add their identification
-     with the corresponding generated fixed points.
-   - Unary predicates (bad argument sequence) and variables as atoms. To tell
-     these two apart, I need symbol tables again. *)
-
-(*************************
- * Interface with Abella *
- *************************)
-
-
-(*maybe I'm repeating part of the processing that I did in test_fun... but does it make sense there?*)
-(*concat_map not defined outside Core*)
-let fpc_udefs_ext name udefs =
-  let wrap str =
-    if String.length str = 0
-    then ""
-    else "\n:=\n" ^ str
-  in
-  List.map (fun (_, body) -> test_fun name body) udefs |>
-  List.concat |>
-  List.sort_uniq String.compare |>
-  String.concat " /\ " |>
-  wrap
-
-(* much of this can be refactored, see define_descr ... *)
-let fpc_theorem_formula name thm =
-  "Define " ^ name ^ " : bool -> prop by\n" ^
-  name ^ " F :=\n" ^
-  fpc_udefs_ext name [(UTrue,thm)] (* there are some things to format there! *) ^  " /\ F =\n" ^
-  fpc_udef_body name thm ^ (* where is the name here? *)
-  "."
-
-let fpc_theorem name thm =
-  (* As nested functions?
-     1. Define formula predicate
-     2. Define prover predicate (we can include the certificate here and keep things simple)
-        - Allow all previously defined theorems as lemmas
-        - Provide a certificate
-     3. Define test *)
-  fpc_theorem_formula name thm (*^
-  fpc_theorem_proof name thm ^
-  fpc_theorem_check name*)
-
-let fpc_codefine idtys udefs =
-  fprintf stdout "FPC codefine"
-*)
-
+(*open Core.Std TODO is_empty, map_concat...*)
 open Metaterm
 open Prover
 open Term (* phase this out? *)
 open Typing
-
-let check_noredef ids =
-  let (_, ctable) = !sign in
-    List.iter (
-      fun id -> if List.mem id (List.map fst ctable) then
-        failwith "Predicate or constant already exists"
-    ) ids
-
-type sign_type =
-  | Type
-  | Predicate
-  | Variable
-
-let check_id id =
-  let (_, ctable) = !sign in
-  try
-    let (_, Poly(_, Ty(_, ty))) = List.find (fun (name, _) -> name = id) ctable
-    in if ty = "prop"
-    then Predicate
-    else Type
-  with
-    Not_found -> Variable
-
 (*
-let rec fpc_uterm = function
-  | UCon(pos, id, ty) -> "{Con/" ^ id ^ ", " ^ ty_descr ty ^ "}"
-  | ULam(pos, id, ty, uterm) -> "{Lam/" ^ id ^ ", " ^ ty_descr ty ^ ", " ^ fpc_uterm uterm ^ "}"
-  | UApp(pos, uterm_x, uterm_y) -> "{App/" ^ fpc_uterm uterm_x ^ ", " ^ fpc_uterm uterm_y ^ "}"
-
-
-(*TODO Compiled support missing *)
-(* 1. List.map2_exn *)
-
 (** Translation: head of a clause, recursive elaboration.
     For clarity and in consideration of the limited complexity of what we
     expect to be "reasonable" predicates, all considerations of efficiency have
@@ -361,7 +278,7 @@ let test_fun name body =
           however, the case of variables. *)
 (*TODO this is now more general and has a HEAD which can be of several types!!!
   TODO add support for lambda
-  TODO refactor the ptr-var treatmant somehow *)
+  TODO refactor the ptr-var treatmant somehow 
 let rec parse_term =
   (** Translation: argument of a predicate call.
       @param uterm Term representing an argument in a predicate call.
@@ -467,20 +384,6 @@ let rec parse_term =
   | DB(_)|Lam (_,_)|Susp(_,_,_,_) -> failwith "term not supported"
 *)
 
-(*name polymorphism?
-  also very important: when changing to FUNCTION, make sure to clean up the argument!
-  note that we can nest "sparse" mattern matches easily! nice *)
-let get_predicate_name = function
-  | Pred(App((Ptr(_) as ptr), _), _) ->
-    let var = observe ptr in
-    ( match var with
-    | Var id ->
-      if check_id id.name = Predicate
-      then id.name
-      else failwith "not a predicate"
-    | _ -> failwith "bad observation" )
-  | _ -> failwith "bad predicate"
-
 (** Translation: decomposition of clause head for parameter mapping.
     This function is meant to be used on the head of a clause into the name of
     the predicate being encoded, and the lists of arguments and variables
@@ -523,6 +426,26 @@ let parse_head = function
   (* Treatment for predicates *)
   | Pred(term, _) -> parse_term term
 (******************************************************************************)
+*)
+
+(*******************************************************************************
+ * Helpers *
+ ***********)
+
+type sign_type =
+  | Type
+  | Predicate
+  | Variable
+
+let check_id id =
+  let (_, ctable) = !sign in
+  try
+    let (_, Poly(_, Ty(_, ty))) = List.find (fun (name, _) -> name = id) ctable
+    in if ty = "prop"
+    then Predicate
+    else Type
+  with
+    Not_found -> Variable
 
 (** Translation: quantify a set of variables.
     @param binder Type of quantification to apply to 'vars'.
@@ -542,17 +465,16 @@ let quantify binder =
     List.fold_left (fun acc var -> acc ^ binder_str ^ " " ^ var ^ "\\ ") "" vars
     |> String.trim
 
-(******************************************************************************)
+(* Meta-level helpers *)
+let and_descriptions strs = String.concat " /\\ " strs
 
-(*********
+(*******************************************************************************
  * Kinds *
  *********)
 
 let describe_kind ids = "" (* Everything will be transparently 'i'-typed *)
 
-(******************************************************************************)
-
-(*********
+(*****************************************************************************s**
  * Types *
  *********)
 
@@ -571,44 +493,9 @@ let describe_type ids ty =
   let ty_str = describe_ty ty in
   "Type " ^ ids_str ^ " " ^ ty_str ^ ".\n"
 
-
-
-
-
-(* Meta-level helpers *)
-let and_descriptions strs = String.concat " /\\ " strs
-
-
-
-
-
-let rec get_predicates = function
-  | True|False|Eq(_, _) -> []
-  | Arrow(mt1, mt2)
-  | Or(mt1, mt2)
-  | And(mt1, mt2)       -> get_predicates mt1 @ get_predicates mt2
-  | Binding(_, _, mt)   -> get_predicates mt
-  | Pred(_, _) as p     -> [p]
-  | Obj(_, _)           -> failwith "metaterm not supported"
-
 (*******************************************************************************
- * Dependencies on external predicates *
- ***************************************)
-
-(* Meta-level enumeration *)
-let describe_dependency id = id ^ " " ^ String.capitalize id
-
-let get_dependencies name defs =
-  List.map get_predicates defs |>
-  List.concat |>
-  List.map get_predicate_name |>
-  List.filter (fun x -> String.compare x name <> 0) |>
-  List.sort_uniq String.compare
-
-(*******************************************************************************
- * (Co)inductive definitions *
- *****************************)
-
+ * Terms *
+ *********)
 
 let rec get_term_variables = function
   | Var(id) ->
@@ -624,21 +511,6 @@ let rec get_term_variables = function
     get_term_variables var
   | DB(_) | Lam(_, _) | Susp(_, _, _, _) -> failwith "term not supported"
 
-let rec get_metaterm_variables = function
-  | True -> []
-  | False -> []
-  | Eq(t1, t2) ->
-    List.sort_uniq String.compare (get_term_variables t1 @ get_term_variables t2)
-  | Arrow(mt1, mt2)
-  | Or(mt1, mt2)
-  | And(mt1, mt2) ->
-    List.sort_uniq compare (get_metaterm_variables mt1 @ get_metaterm_variables mt2)
-  | Binding(_, _, mt) ->
-    List.sort compare (get_metaterm_variables mt) (*make sure that the binders are not included!*)
-  | Pred(t, _) ->
-    List.sort compare (get_term_variables t)
-  | Obj(_, _) -> failwith "metaterm not supported"
-
 let rec describe_term = function
   | Var(id) -> id.name
   | App(name, args) ->
@@ -649,6 +521,24 @@ let rec describe_term = function
     let var = observe ptr in
     describe_term var
   | DB(_) | Lam(_, _) | Susp(_, _, _, _) -> failwith "term not supported"
+
+(*******************************************************************************
+ * Predicate calls *
+ *******************)
+
+(*name polymorphism?
+  also very important: when changing to FUNCTION, make sure to clean up the argument!
+  note that we can nest "sparse" mattern matches easily! nice *)
+let get_predicate_name = function
+  | Pred(App((Ptr(_) as ptr), _), _) ->
+    let var = observe ptr in
+    ( match var with
+    | Var id ->
+      if check_id id.name = Predicate
+      then id.name
+      else failwith "not a predicate"
+    | _ -> failwith "bad observation" )
+  | _ -> failwith "bad predicate"
 
 let get_predicate_arguments = function
   | Pred(App(_, args) ,_) ->
@@ -696,6 +586,56 @@ let describe_predicate global_name = function
     let args_str = describe_arguments args in
     "(" ^ name_str ^ " " ^ args_str  ^ ")"
   | _ -> failwith "not a predicate"
+
+(*******************************************************************************
+ * Predicate dependencies *
+ **************************)
+
+let rec get_predicates = function
+  | True|False|Eq(_, _) -> []
+  | Arrow(mt1, mt2)
+  | Or(mt1, mt2)
+  | And(mt1, mt2)       -> get_predicates mt1 @ get_predicates mt2
+  | Binding(_, _, mt)   -> get_predicates mt
+  | Pred(_, _) as p     -> [p]
+  | Obj(_, _)           -> failwith "metaterm not supported"
+
+(* Meta-level enumeration *)
+let describe_dependency id = id ^ " " ^ String.capitalize id
+
+let get_dependencies name defs =
+  List.map get_predicates defs |>
+  List.concat |>
+  List.map get_predicate_name |>
+  List.filter (fun x -> String.compare x name <> 0) |>
+  List.sort_uniq String.compare
+
+(* Refactor with theorem dependencies, consider duplicate steps *)
+let describe_dependencies name defs decorate =
+  List.map (fun (_, body) -> body) defs |>
+  get_dependencies name |>
+  List.map describe_dependency |>
+  and_descriptions |>
+  decorate
+
+(*******************************************************************************
+ * Metaterms *
+ *************)
+
+let rec get_metaterm_variables = function
+  | True -> []
+  | False -> []
+  | Eq(t1, t2) ->
+    List.sort_uniq String.compare (get_term_variables t1 @ get_term_variables t2)
+  | Arrow(mt1, mt2)
+  | Or(mt1, mt2)
+  | And(mt1, mt2) ->
+    List.sort_uniq compare (get_metaterm_variables mt1 @ get_metaterm_variables mt2)
+  | Binding(_, _, mt) ->
+    List.sort compare (get_metaterm_variables mt) (*make sure that the binders are not included!*)
+  | Pred(t, _) ->
+    List.sort compare (get_term_variables t)
+  | Obj(_, _) -> failwith "metaterm not supported"
 
 (** Translation: body of a clause.
     @param name Name of the predicate being translated.
@@ -746,8 +686,9 @@ let rec describe_metaterm name = function
   | Obj(_, _) ->
     failwith "metaterm not supported"
 
-(* Another wrapper (I'm working upwards, so the order reads wrong)*)
-let describe_body name body = describe_metaterm name body
+(*******************************************************************************
+ * (Co)inductive definitions *
+ *****************************)
 
 (** Translation: single clause in a predicate definition to (disjunctive) clause
     in the fixed point encoding.
@@ -764,7 +705,7 @@ let describe_definition (head, body) =
   let args = get_predicate_arguments head in
   let vars_str = quantify Exists vars in
   let args_str = describe_arguments args in
-  let body_str = describe_body name body in
+  let body_str = describe_metaterm name body in
   "(" ^ vars_str ^ " (and (eq Args " ^ args_str ^ ")\n" ^
   body_str ^
   "\n))"
@@ -794,17 +735,6 @@ let rec describe_definitions = function
   | hd :: (hd' :: tl' as tl) ->
     "(or " ^ describe_definition hd ^ "\n" ^ describe_definitions tl ^ ")"
 
-(* just a wrapper for the propertly-named function... *)
-let describe_body defs = describe_definitions defs
-
-(* Refactor with theorem dependencies, consider duplicate steps *)
-let describe_dependencies name defs decorate =
-  List.map (fun (_, body) -> body) defs |>
-  get_dependencies name |>
-  List.map describe_dependency |>
-  and_descriptions |>
-  decorate
-
 (** Translation: inductive predicate to least fixed point.
     The function produces a left-associative chain of disjunctions, each leaf
     encoding one of the clauses of the predicate.
@@ -831,7 +761,7 @@ let describe_fixed_point op defs = function
     in
     "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
     name ^ " (" ^ op ^ " Pred\\Args\\\n" ^
-    describe_body defs ^
+    describe_definitions defs ^
     "\n)" ^
     describe_dependencies name defs decorate ^
     ".\n"
@@ -858,6 +788,24 @@ let describe_theorem name thm =
   deps_str ^  "F =\n" ^
   thm_str ^ (* where is the name here? *)
   ".\n"
+
+(* TODO
+   - Substitute predicate names for logic variables and add their identification
+     with the corresponding generated fixed points.
+   - Unary predicates (bad argument sequence) and variables as atoms. To tell
+     these two apart, I need symbol tables again.
+
+let fpc_theorem name thm =
+  (* As nested functions?
+     1. Define formula predicate
+     2. Define prover predicate (we can include the certificate here and keep things simple)
+        - Allow all previously defined theorems as lemmas
+        - Provide a certificate
+     3. Define test *)
+  fpc_theorem_formula name thm (*^
+  fpc_theorem_proof name thm ^
+  fpc_theorem_check name*)
+*)
 
 (*******************************************************************************
  * Output file manipulation *
