@@ -484,9 +484,9 @@ let describe_ids ids =
 let rec describe_ty = function Ty(tys, id) ->
   let tys_str = List.map describe_ty tys |> String.concat " -> " in
   match tys with
-  | []          ->                             id (* Simple type *)
-  | [_]         -> "( " ^ tys_str ^ " ) -> " ^ id (* Left-associative *)
-  | _ :: _ :: _ ->        tys_str ^   " -> " ^ id (* Right-associative *)
+  | []          ->                        "i" (* Simple type *)
+  | [_]         -> "( " ^ tys_str ^ " ) -> i" (* Left-associative *)
+  | _ :: _ :: _ ->        tys_str ^   " -> i" (* Right-associative *)
 
 let describe_type ids ty =
   let ids_str = describe_ids ids in
@@ -808,6 +808,67 @@ let fpc_theorem name thm =
 *)
 
 (*******************************************************************************
+ * Theorem proofs *
+ ******************)
+
+let test_theorems =
+  (*List.map fst !lemmas |> String.concat " "*)
+  Printf.sprintf "%d" (List.length !lemmas)
+
+(*I assume everything is of my shape*)
+let get_theorems =
+  List.map fst !lemmas |>
+  List.map (Str.replace_first (Str.regexp "__proof__$") "")
+
+let get_proof_name pred_name =
+  pred_name ^ "__proof__"
+
+(*NAMING CONVENTION, HERE!!
+  by default, make all previous lemmas available; otherwise we rely on a
+  concrete proof, which currently we don't have, though it would be best
+  TODO use proof script if at all possible and come back!
+  TODO refactor with describe_dependency*)
+let describe_proof_stub pred_name =
+  let proof_name = pred_name ^ "__proof__" in
+  let pred_var = String.capitalize pred_name in
+  let describe_lemmas lemmas =
+      List.fold_right (fun lemma acc ->
+        Printf.sprintf "(lemma (name \"%s\") %s) :: %s"
+                        pred_name
+                        (String.capitalize pred_name)
+                        acc)
+        lemmas "nil"
+  in
+  Printf.sprintf "Define %s : cert -> prop by\n\
+                  %s Cert :=\n\
+                  %s %s /\\\n\
+                  %s\
+                  prove_with_lemmas Cert %s\n\
+                  %s\n\
+                  .\n"
+                  proof_name
+                  proof_name
+                  pred_name pred_var
+                  (List.map describe_dependency get_theorems |> and_descriptions) (*refactor, cf. describe_dependencies & friends; also consider newlines!*)
+                  pred_var
+                  (describe_lemmas get_theorems)
+
+let describe_proof_check pred_name =
+  Printf.sprintf "#assert %s\n\
+                  **your certificate here**\n\
+                  .\n"
+                  (get_proof_name pred_name)
+
+(*
+#include "logic.thm".
+#include "cert-sig.thm".
+#include "admin-fpc.thm".
+#include "plus-examples-sig.thm".
+#include "kernel.thm".
+#include "plus-examples.thm".
+*)
+
+(*******************************************************************************
  * Output file manipulation *
  ****************************)
 
@@ -820,8 +881,19 @@ let append text file =
  * Module interface *
  ********************)
 
-let ckind ids = append (describe_kind ids) "fpc-decl.mod"
-let ctype ids ty = append (describe_type ids ty) "fpc-decl.mod"
-let cdefine defs idtys = append (describe_define defs idtys) "fpc-decl.mod"
-let ccodefine defs idtys = append (describe_codefine defs idtys) "fpc-decl.mod"
-let ctheorem id mterm = append (describe_theorem id mterm) "fpc-decl.mod"
+let ckind ids =
+  append (describe_kind ids) "fpc-decl.mod"
+
+let ctype ids ty =
+  append (describe_type ids ty) "fpc-decl.mod"
+
+let cdefine defs idtys =
+  append (describe_define defs idtys) "fpc-decl.mod"
+
+let ccodefine defs idtys =
+  append (describe_codefine defs idtys) "fpc-decl.mod"
+
+let ctheorem id mterm =
+  append (describe_theorem id mterm) "fpc-decl.mod" ;
+  append (describe_proof_stub id) "fpc-decl.mod" ;
+  append (describe_proof_check id) "fpc-test.mod"
