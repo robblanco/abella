@@ -417,10 +417,16 @@ let test_theorems =
   sprintf "%d" (List.length !lemmas)
 *)
 
+let get_theorems () =
+  !lemmas |> List.map fst
+
 (*I assume everything is of my shape*)
-let get_theorems =
-  List.map fst !lemmas |>
-  List.map (Str.replace_first (Str.regexp "__proof__$") "")
+let describe_lemma_list lemmas =
+  List.fold_right (fun lemma acc -> sprintf "(lemma (name \"%s\") %s) :: %s"
+                                             lemma
+                                             (String.capitalize lemma)
+                                             acc)
+    lemmas "nil"
 
 let get_proof_name pred_name =
   pred_name ^ "__proof__"
@@ -431,29 +437,27 @@ let get_proof_name pred_name =
   TODO use proof script if at all possible and come back!
   TODO refactor with describe_dependency*)
 let describe_proof_stub pred_name =
-  let proof_name = pred_name ^ "__proof__" in
+  (*get_theorems doesn't seem to work*)
+  let proof_name = get_proof_name pred_name in
   let pred_var = String.capitalize pred_name in
-  let describe_lemmas lemmas =
-      List.fold_right (fun lemma acc ->
-        sprintf "(lemma (name \"%s\") %s) :: %s"
-                  pred_name
-                  (String.capitalize pred_name)
-                  acc)
-        lemmas "nil"
-  in
+  let lemmas = get_theorems () |> List.filter (fun x -> x <> pred_name) in
+  let decorate str =
+    if String.length str = 0
+    then ""
+    else  str ^ " /\\\n" in
   sprintf "Define %s : cert -> prop by\n\
            %s Cert :=\n\
            %s %s /\\\n\
            %s\
            prove_with_lemmas Cert %s\n\
-           %s\n\
+           (%s)\n\
            .\n"
            proof_name
            proof_name
            pred_name pred_var
-           (List.map describe_dependency get_theorems |> and_descriptions) (*refactor, cf. describe_dependencies & friends; also consider newlines!*)
+           (List.map describe_dependency lemmas |> and_descriptions |> decorate) (*refactor, cf. describe_dependencies & friends; also consider newlines!*)
            pred_var
-           (describe_lemmas get_theorems)
+           (describe_lemma_list lemmas)
 
 let describe_proof_check pred_name =
   sprintf "#assert %s\n\
@@ -482,7 +486,6 @@ let append text file =
 let describe_copy_i =
   let (_, ctable) = !sign in
   List.map fst ctable |> String.concat " "
-  
 
 (*******************************************************************************
  * Module interface *
