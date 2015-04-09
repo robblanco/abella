@@ -2,6 +2,7 @@
     @todo Use Core.Std? is_empty, concat_map... *)
 
 open Metaterm
+open Printf
 open Prover
 open Term
 open Typing
@@ -413,7 +414,7 @@ let describe_theorem name thm =
 (*
 let test_theorems =
   (*List.map fst !lemmas |> String.concat " "*)
-  Printf.sprintf "%d" (List.length !lemmas)
+  sprintf "%d" (List.length !lemmas)
 *)
 
 (*I assume everything is of my shape*)
@@ -434,31 +435,31 @@ let describe_proof_stub pred_name =
   let pred_var = String.capitalize pred_name in
   let describe_lemmas lemmas =
       List.fold_right (fun lemma acc ->
-        Printf.sprintf "(lemma (name \"%s\") %s) :: %s"
-                        pred_name
-                        (String.capitalize pred_name)
-                        acc)
+        sprintf "(lemma (name \"%s\") %s) :: %s"
+                  pred_name
+                  (String.capitalize pred_name)
+                  acc)
         lemmas "nil"
   in
-  Printf.sprintf "Define %s : cert -> prop by\n\
-                  %s Cert :=\n\
-                  %s %s /\\\n\
-                  %s\
-                  prove_with_lemmas Cert %s\n\
-                  %s\n\
-                  .\n"
-                  proof_name
-                  proof_name
-                  pred_name pred_var
-                  (List.map describe_dependency get_theorems |> and_descriptions) (*refactor, cf. describe_dependencies & friends; also consider newlines!*)
-                  pred_var
-                  (describe_lemmas get_theorems)
+  sprintf "Define %s : cert -> prop by\n\
+           %s Cert :=\n\
+           %s %s /\\\n\
+           %s\
+           prove_with_lemmas Cert %s\n\
+           %s\n\
+           .\n"
+           proof_name
+           proof_name
+           pred_name pred_var
+           (List.map describe_dependency get_theorems |> and_descriptions) (*refactor, cf. describe_dependencies & friends; also consider newlines!*)
+           pred_var
+           (describe_lemmas get_theorems)
 
 let describe_proof_check pred_name =
-  Printf.sprintf "#assert %s\n\
-                  **your certificate here**\n\
-                  .\n"
-                  (get_proof_name pred_name)
+  sprintf "#assert %s\n\
+           **your certificate here**\n\
+           .\n"
+           (get_proof_name pred_name)
 
 (*
 #include "logic.thm".
