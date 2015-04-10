@@ -1,5 +1,6 @@
 (** Export Abella sessions for external verification.
     @todo Use Core.Std? is_empty, concat_map... *)
+(* what would happen during e.g. redefinitions?*)
 
 open Printf
 
@@ -420,8 +421,23 @@ let test_theorems =
   sprintf "%d" (List.length !lemmas)
 *)
 
-let get_theorems () =
-  !lemmas |> List.map fst
+let get_lemma_names pred_name =
+  let rec discard_to_theorem name = function
+    | [] -> []
+    | CTheorem(id, _) :: tl when id = name -> tl
+    | _ :: tl -> discard_to_theorem name tl in
+  let is_theorem = function
+    | CTheorem(_, _) -> true
+    | _ -> false in
+  let theorem_name = function
+    | CTheorem(id, _) -> id
+    | _ -> failwith "not a theorem" in
+  !commands |>
+  discard_to_theorem pred_name |>
+  List.filter is_theorem |>
+  List.map theorem_name
+
+  
 
 (*I assume everything is of my shape*)
 let describe_lemma_list lemmas =
@@ -443,7 +459,7 @@ let describe_proof_stub pred_name =
   (*get_theorems doesn't seem to work*)
   let proof_name = get_proof_name pred_name in
   let pred_var = String.capitalize pred_name in
-  let lemmas = get_theorems () |> List.filter (fun x -> x <> pred_name) in
+  let lemmas = get_lemma_names pred_name |> List.filter (fun x -> x <> pred_name) in
   let decorate str =
     if String.length str = 0
     then ""
@@ -550,6 +566,12 @@ let describe_copy_i () =
      copy_i Theta (X ++ Y) (U ++ V) := copy_i Theta X U /\\ copy_i Theta Y V."
     body_str
 
+let is_pervasive name =
+	pervasive_sign |>
+	snd |>
+	List.map fst |>
+	List.exists (fun x -> x = name)
+  
 let describe_name_mnu () =
 (*refactor copied code from check_id! patterns from copy_i...*)
 (*remove pervasives!*)
@@ -557,7 +579,9 @@ let describe_name_mnu () =
   let preds =
     ctable |>
     List.filter (fun (_, Poly(_, Ty(_, base))) -> base = "prop") |>
-    List.map fst in
+    List.map fst |>
+(*refactoring possibility use of pervasive_sign, filtering function*) (*List.exists (fun y -> x = y) (fst pervasive_sign)*)
+    List.filter (fun x -> not (is_pervasive x)) in
   if List.length preds = 0 then
     "Define name_mnu : string -> (i -> bool) -> prop by name_mnu _ _ := false."
   else
