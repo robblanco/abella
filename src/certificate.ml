@@ -3,6 +3,7 @@
 
 open Printf
 
+open Abella_types
 open Metaterm
 open Prover
 open Term
@@ -20,7 +21,8 @@ open Typing
    framework, so it makes sense to be stateful and reuse the state if possible.
    This is brittle and we can't make many assumptions, but will work for now. *)
 
-(*let translation = ref ""*)
+(*reverse chronological list of commands*)
+let commands : compiled list ref = ref []
 
 (*******************************************************************************
  * Helpers *
@@ -54,7 +56,7 @@ let quantify binder =
     | Exists -> "some"
     | Nabla  -> failwith "binder not supported") binder
   in function
-  | [] -> assert false
+  | [] -> "???" (*assert false*) (*TODO - this fails when I register the compiled interactive theorem!*)
   | (hd :: tl) as vars ->
     List.fold_left (fun acc var -> acc ^ binder_str ^ " " ^ var ^ "\\ ") "" vars
     |> String.trim
@@ -561,7 +563,8 @@ let describe_name_mnu () =
   else
     let body_str =
       preds |>
-      List.map (fun x -> sprintf "name_mnu \"%s\" %s := %s %s" x x x x) |>
+      List.map (fun x -> sprintf "name_mnu \"%s\" %s := %s %s"
+        x (String.capitalize x) x (String.capitalize x)) |> (* fix this with proper functions! *)
       String.concat " ;\n" in
     sprintf "Define name_mnu : string -> (i -> bool) -> prop by\n%s." body_str
     
@@ -578,6 +581,45 @@ let describe_signature () =
     (describe_copy_i ())
     (describe_name_mnu ())
 
+let describe_kernel () =
+  "#include \"logic.thm\".\n\
+   #include \"cert-sig.thm\".\n\
+   #include \"admin-fpc.thm\".\n\
+   #include \"fpc-sign.mod\".\n\
+   #include \"kernel.thm\".\n\
+   #include \"fpc-thms.mod\".\n\
+   \n"
+
+(*******************************************************************************
+ * ... *
+ ********************)
+
+let start_files () =
+  append (describe_signature ()) "fpc-sign.mod" ;
+  append (describe_kernel ()) "fpc-test.mod"
+
+(*******************************************************************************
+ * ... *
+ ********************)
+
+let process_command = function
+  | CTheorem(id, mterm) ->
+      append (describe_theorem id mterm) "fpc-thms.mod" ;
+      append (describe_proof_stub id) "fpc-thms.mod" ;
+      append (describe_proof_check id) "fpc-test.mod"
+  | CDefine(idtys, defs) ->
+      append (describe_define defs idtys) "fpc-decl.mod"
+  | CCoDefine(idtys, defs) ->
+      append (describe_codefine defs idtys) "fpc-decl.mod"
+  | CType(ids, ty) ->
+      append (describe_type ids ty) "fpc-decl.mod"
+  | _ -> failwith "unsupported command"
+
+let process_commands () =
+  !commands |>
+  List.rev |>
+  List.iter process_command
+  
 (*******************************************************************************
  * Module interface *
  ********************)
@@ -598,9 +640,19 @@ let ccodefine defs idtys =
 let ctheorem id mterm =
   append (describe_theorem id mterm) "fpc-thms.mod" ;
   append (describe_proof_stub id) "fpc-thms.mod" ;
-  append (describe_proof_check id) "fpc-test.mod"
+  append (describe_proof_check id) "fpc-thms.mod"(*"fpc-test.mod"*)
+
+let register cmd = match cmd with
+  | CTheorem(_, _)
+  | CDefine(_, _)
+  | CCoDefine(_, _)
+  | CType(_,_)      -> commands := (cmd :: !commands)
+  | CKind(_)        -> ()
+  | _               -> failwith "unsupported command"
 
 (*an alternative: collect directives in an ordered list and do everything in one go*)
 let certify () =
-  append (describe_signature ()) "fpc-sign.mod" ;
+  start_files () ;
+  process_commands () ;
+  commands := []
   (*create_signature ()*)

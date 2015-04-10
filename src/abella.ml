@@ -337,31 +337,31 @@ let import filename =
           (function
              | CTheorem(name, thm) ->
                  add_lemma name thm ;
-                 Certificate.ctheorem name thm ; (*RB*)
+                 Certificate.register (CTheorem(name, thm)) ; (*RB*)
              | CDefine(idtys, defs) ->
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
                    add_global_consts idtys ;
                    add_defs ids Inductive defs ;
-                   Certificate.cdefine defs idtys ; (*RB*)
+                   Certificate.register (CDefine(idtys, defs)) ; (*RB*)
              | CCoDefine(idtys, defs) ->
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
                    add_global_consts idtys ;
                    add_defs ids CoInductive defs ;
-                   Certificate.ccodefine defs idtys ; (*RB*)
+                   Certificate.register (CCoDefine(idtys, defs)) ; (*RB*)
              | CImport(filename) ->
                  aux filename
              | CKind(ids) ->
                  check_noredef ids;
                  add_global_types ids ;
-                 Certificate.ckind ids ; (*RB*)
+                 Certificate.register (CKind(ids)) ; (*RB*)
              | CType(ids, ty) ->
                  check_noredef ids;
                  add_global_consts (List.map (fun id -> (id, ty)) ids) ;
-                 Certificate.ctype ids ty ; (*RB*)
+                 Certificate.register (CType(ids, ty)) ; (*RB*)
              | CClose(ty_subords) ->
                  List.iter
                    (fun (ty, prev) ->
@@ -590,13 +590,15 @@ let rec process () =
                 process_proof name ;
                 compile (CTheorem(name, thm)) ;
                 add_lemma name thm ;
-                Certificate.ctheorem name thm ; (*RB*)
+                Certificate.register (CTheorem(name, thm)) ; (*RB*)
+
 let (_, ctable) = !sign in
 ctable |>
 List.filter (fun (_, Poly(_, Ty(_, base))) -> not (List.exists (fun x -> x = base) (fst pervasive_sign))) |>
 List.map (fun (name, Poly(_, Ty(args, _))) -> (name, List.length args)) |>
 List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
 (*!lemmas |> List.map fst |> List.iter (fun x -> Printf.eprintf "%s\n%!" x) ;*)
+
               with AbortProof -> () end
         | SSplit(name, names) ->
             let thms = create_split_theorems name names in
@@ -615,7 +617,7 @@ List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
                 commit_global_consts local_sr local_sign ;
                 compile (CDefine(idtys, defs)) ;
                 add_defs ids Inductive defs ;
-                Certificate.cdefine defs idtys ; (*RB*)
+                Certificate.register (CDefine(idtys, defs)) ; (*RB*)
         | CoDefine(idtys, udefs) ->
             let ids = List.map fst idtys in
               check_noredef ids;
@@ -625,7 +627,7 @@ List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
                 commit_global_consts local_sr local_sign ;
                 compile (CCoDefine(idtys, defs)) ;
                 add_defs ids CoInductive defs ;
-                Certificate.ccodefine defs idtys ; (*RB*)
+                Certificate.register (CCoDefine(idtys, defs)) ; (*RB*)
         | TopCommon(Set(k, v)) ->
             set k v
         | TopCommon(Show(n)) ->
@@ -647,12 +649,12 @@ List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
             check_noredef ids;
             add_global_types ids ;
             compile (CKind ids) ;
-            Certificate.ckind ids ; (*RB*)
+            Certificate.register (CKind(ids)) ; (*RB*)
         | Type(ids, ty) ->
             check_noredef ids;
             add_global_consts (List.map (fun id -> (id, ty)) ids) ;
             compile (CType(ids, ty)) ;
-            Certificate.ctype ids ty ; (*RB*)
+            Certificate.register (CType(ids, ty)) ; (*RB*)
         | Close(ids) ->
             close_types ids ;
             compile
