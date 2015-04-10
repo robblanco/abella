@@ -8,3 +8,6 @@ val ccodefine : Abella_types.defs -> Term.tyctx -> unit
 val ctheorem : Term.id -> Metaterm.metaterm -> unit
 
 (* Interactive declarations *)
+
+(**)
+val certify : unit -> unit

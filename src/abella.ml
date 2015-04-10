@@ -591,6 +591,12 @@ let rec process () =
                 compile (CTheorem(name, thm)) ;
                 add_lemma name thm ;
                 Certificate.ctheorem name thm ; (*RB*)
+let (_, ctable) = !sign in
+ctable |>
+List.filter (fun (_, Poly(_, Ty(_, base))) -> not (List.exists (fun x -> x = base) (fst pervasive_sign))) |>
+List.map (fun (name, Poly(_, Ty(args, _))) -> (name, List.length args)) |>
+List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
+(*!lemmas |> List.map fst |> List.iter (fun x -> Printf.eprintf "%s\n%!" x) ;*)
               with AbortProof -> () end
         | SSplit(name, names) ->
             let thms = create_split_theorems name names in
@@ -668,6 +674,7 @@ let rec process () =
         if !switch_to_interactive then
           perform_switch_to_interactive ()
         else begin
+          Certificate.certify () ; (*RB*)
           fprintf !out "Goodbye.\n%!" ;
           ensure_finalized_specification () ;
           write_compilation () ;

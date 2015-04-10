@@ -1,8 +1,9 @@
 (** Export Abella sessions for external verification.
     @todo Use Core.Std? is_empty, concat_map... *)
 
-open Metaterm
 open Printf
+
+open Metaterm
 open Prover
 open Term
 open Typing
@@ -488,6 +489,96 @@ let describe_copy_i =
   List.map fst ctable |> String.concat " "
 
 (*******************************************************************************
+ * File generation *
+ *******************)
+
+(* Definitions file: types and definitions                            -- fpc-decl.mod
+   Theorem signature file: include definitions file, copy_i, name_mnu -- fpc-sign.mod
+   Theorem declaration: theorems                                      -- fpc-thms.mod
+   Proofs file: include everything, asserts                           -- fpc-test.mod
+   *)
+
+(*right now, in reverse order, just to keep it quick
+argc positive*)
+let rec get_argument_list argc prefix =
+  if argc = 0 then []
+  else
+    let hd = prefix ^ string_of_int argc in
+    let tl = get_argument_list (argc - 1) prefix in
+    hd :: tl
+
+(*test with infix operators!*)
+let describe_constructor name argc prefix =
+  if argc = 0 then name
+  else
+    let args = get_argument_list argc prefix |> String.concat " " in
+    sprintf "(%s %s)" name args
+
+(*if I care about efficiency, return lists in describe_constructor and pass them here*)
+let describe_copy_i_constructor argc prefix1 prefix2 =
+  let args1 = get_argument_list argc prefix1 in
+  let args2 = get_argument_list argc prefix2 in
+  let copies =
+    List.map2(*_exn*) (fun x y -> sprintf "copy_i Theta %s %s" x y) args1 args2 |>
+    and_descriptions in
+  if argc = 0 then ""
+  else sprintf ":= %s " copies
+
+(* avoid hardwired argv, ++? *)
+let describe_copy_i () =
+  let (_, ctable) = !sign in
+  let body_str =
+    ctable |>
+    (* List of type constructors *)
+    List.filter (fun (_, Poly(_, Ty(_, base))) -> not (List.exists
+                (fun x -> x = base)
+                (fst pervasive_sign))) |>
+    (* Tuples of names and arities *)
+    List.map (fun (name, Poly(_, Ty(args, _))) -> (name, List.length args)) |>
+    (* Line formatting *)
+    List.map (fun (name, argc) -> sprintf "copy_i Theta %s %s %s;\n"
+             (describe_constructor name argc "A")
+             (describe_constructor name argc "B")
+             (describe_copy_i_constructor argc "A" "B")) |>
+    String.concat "" in
+  sprintf
+    "Define list imap -> i -> i -> prop by\n\
+     %s\
+     copy_i Theta argv argv ;\n\
+     copy_i Theta (X ++ Y) (U ++ V) := copy_i Theta X U /\\ copy_i Theta Y V."
+    body_str
+
+let describe_name_mnu () =
+(*refactor copied code from check_id! patterns from copy_i...*)
+(*remove pervasives!*)
+  let (_, ctable) = !sign in
+  let preds =
+    ctable |>
+    List.filter (fun (_, Poly(_, Ty(_, base))) -> base = "prop") |>
+    List.map fst in
+  if List.length preds = 0 then
+    "Define name_mnu : string -> (i -> bool) -> prop by name_mnu _ _ := false."
+  else
+    let body_str =
+      preds |>
+      List.map (fun x -> sprintf "name_mnu \"%s\" %s := %s %s" x x x x) |>
+      String.concat " ;\n" in
+    sprintf "Define name_mnu : string -> (i -> bool) -> prop by\n%s." body_str
+    
+(*List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;*)
+
+let describe_signature () =
+  sprintf
+    "#include \"fpc-decl.mod\".\n\
+     \n\
+     %s\n\
+     \n\
+     %s\n\
+     \n"
+    (describe_copy_i ())
+    (describe_name_mnu ())
+
+(*******************************************************************************
  * Module interface *
  ********************)
 
@@ -495,8 +586,8 @@ let ckind ids =
   append (describe_kind ids) "fpc-decl.mod"
 
 let ctype ids ty =
-  append (describe_type ids ty) "fpc-decl.mod" ;
-  append (describe_copy_i) "fpc-decl.mod"
+  append (describe_type ids ty) "fpc-decl.mod" (*;
+  append (describe_copy_i) "fpc-decl.mod"*)
 
 let cdefine defs idtys =
   append (describe_define defs idtys) "fpc-decl.mod"
@@ -505,6 +596,11 @@ let ccodefine defs idtys =
   append (describe_codefine defs idtys) "fpc-decl.mod"
 
 let ctheorem id mterm =
-  append (describe_theorem id mterm) "fpc-decl.mod" ;
-  append (describe_proof_stub id) "fpc-decl.mod" ;
+  append (describe_theorem id mterm) "fpc-thms.mod" ;
+  append (describe_proof_stub id) "fpc-thms.mod" ;
   append (describe_proof_check id) "fpc-test.mod"
+
+(*an alternative: collect directives in an ordered list and do everything in one go*)
+let certify () =
+  append (describe_signature ()) "fpc-sign.mod" ;
+  (*create_signature ()*)
