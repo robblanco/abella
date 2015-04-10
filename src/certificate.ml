@@ -56,7 +56,7 @@ let quantify binder =
     | Exists -> "some"
     | Nabla  -> failwith "binder not supported") binder
   in function
-  | [] -> "???" (*assert false*) (*TODO - this fails when I register the compiled interactive theorem!*)
+  | [] -> "" (*assert false*) (*TODO - for clauses without variables -- fix formatting! *)
   | (hd :: tl) as vars ->
     List.fold_left (fun acc var -> acc ^ binder_str ^ " " ^ var ^ "\\ ") "" vars
     |> String.trim
@@ -544,7 +544,7 @@ let describe_copy_i () =
              (describe_copy_i_constructor argc "A" "B")) |>
     String.concat "" in
   sprintf
-    "Define list imap -> i -> i -> prop by\n\
+    "Define copy_i : list imap -> i -> i -> prop by\n\
      %s\
      copy_i Theta argv argv ;\n\
      copy_i Theta (X ++ Y) (U ++ V) := copy_i Theta X U /\\ copy_i Theta Y V."
