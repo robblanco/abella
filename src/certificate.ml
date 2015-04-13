@@ -845,25 +845,6 @@ let process_commands () =
   parse tree into another target parse tree, and implement printing functions
   for each of these components.*)
 
-let ckind ids =
-  () (*append (describe_kind ids) "fpc-decl.mod"*)
-
-let ctype ids ty =
-  append (describe_type ids ty) "fpc-decl.mod" (*;
-  append (describe_copy_i) "fpc-decl.mod"*)
-
-let cdefine defs idtys =
-  append (describe_define defs idtys) "fpc-decl.mod"
-
-let ccodefine defs idtys =
-  append (describe_codefine defs idtys) "fpc-decl.mod"
-
-let ctheorem id mterm =
-  append (describe_theorem id mterm) "fpc-thms.mod" ;
-  append (describe_proof_stub id) "fpc-thms.mod" ;
-  append (describe_proof_check id) "fpc-thms.mod"(*"fpc-test.mod"*)
-
-
 (** Queue command for batch translation.
   * @param cmd Compiled command.
   * @raise Unsupported commands. *)
