@@ -1,12 +1,28 @@
-(** Export Abella sessions for external verification.
-    @todo Use Core.Std? is_empty, concat_map... *)
-(* what would happen during e.g. redefinitions?*)
-(*Unify coding style where appropriate: hierarchical parsing vs. getters and manipulators. - this, now to general comments
- Good unit test framework
- Also note, it's really difficult to know where failwiths are propagaged! Only locally... same with exceptions? *)
+(** Certification of Abella sessions.
+  *   This module integrates with the built-in Abella parser to produce a
+  * translation accepted by a checker based on an intuitionistic focused proof
+  * system (muLJF) with foundational proof certificates (FPC), developed in
+  * Bedwyr.
+  *   Translation is functional but, like the checker, very much a work in
+  * progress. There are much more elegant architectures and a parse tree for the
+  * meta-language of the checker should be produced once its grammar
+  * crystallizes a bit more; for now, responsive prototyping preponderates.
+  *   The translation itself depends "only" on the meta-language, by virtue of
+  * being blind to proof scripts and generating no proof obligations whatsoever;
+  * these are stubbed and the user must fill in the FPC that corresponds to a
+  * proof of each theorem. In truth, there is one small dependency in the sense
+  * that the checker is instantiated against one particular FPC "administrative"
+  * template heavily reminiscent of Abella-style proofs, but this can be readily
+  * swapped as desired.
+  * @todo Unit tests are needed everywhere (good framework?), even though the
+  *   prototypical translation style does not lend itself to clean tests.
+  * @todo Error checking, assertions, etc., need to be reviewed throughout.
+  *   Mostly failwith's are used now, and it is difficult to determine which
+  *   exceptions are propagated where. *)
 
 open Printf
 
+(* Limit scope of these modules as possible. *)
 open Abella_types
 open Metaterm
 open Prover
@@ -182,19 +198,6 @@ function
 | Pred(term, _) -> application_name term
 | True | False | Eq(_, _) | Obj(_, _) | Arrow(_, _)| Binding(_, _, _) |
   Or(_, _) | And(_, _) -> failwith "not a predicate"
-
-(*
-let get_predicate_name = function
-  | Pred(App((Ptr(_) as ptr), _), _) ->
-    let var = observe ptr in
-    ( match var with
-    | Var id ->
-      if id_type id.name = Predicate
-      then id.name
-      else failwith "not a predicate"
-    | _ -> failwith "bad observation" )
-  | _ -> failwith "bad predicate"
-*)
 
 (** Arguments of a predicate metaterm in string format.
   * @param mterm Metaterm.
@@ -389,27 +392,6 @@ function
   describe_predicate name p
 | Obj(_, _) -> failwith "metaterm not supported"
 
-(*
-function
-| True -> "tt"
-| False -> "ff"
-| Eq(t1, t2) ->
-  "(eq " ^ describe_term t1 ^ " " ^ describe_term t2 ^ ")"
-| Arrow(mt1, mt2) ->
-  "(imp " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
-| Binding(b, idtys, mt) ->
-  let ids = List.map (fun (id, _) -> id) idtys in (*TODO fst*)
-  let ids_str = quantify b ids in
-  "(" ^ ids_str ^ describe_metaterm name mt ^ ")"
-| Or(mt1, mt2) ->
-  "(or "  ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
-| And(mt1, mt2) ->
-  "(and " ^ describe_metaterm name mt1 ^ " " ^ describe_metaterm name mt2 ^ ")"
-| Pred(_, _) as p ->
-  describe_predicate name p
-| Obj(_, _) -> failwith "metaterm not supported"
-*)
-
 (*******************************************************************************
  * (Co)inductive definitions *
  *****************************)
@@ -426,11 +408,6 @@ let describe_definition (head, body) =
   and args_str = describe_arguments args
   and body_str = describe_metaterm name body in
   sprintf "(%s(and (eq Args %s)\n%s\n))" vars_str args_str body_str
-(*
-  "(" ^ vars_str ^ "(and (eq Args " ^ args_str ^ ")\n" ^
-  body_str ^
-  "\n))"
-*)
 
 (** Multi-clause predicate definition to disjunctive fixed point, sans header.
   *   Produces a left-associative chain of disjunctions, each leaf encoding one
@@ -452,9 +429,6 @@ let rec describe_definitions = function
   describe_definition hd
 | hd :: (_ :: _ as tl) ->
   sprintf "(or %s\n%s)" (describe_definition hd) (describe_definitions tl)
-(*
-  "(or " ^ describe_definition hd ^ "\n" ^ describe_definitions tl ^ ")"
-*)
 
 (** Inductive predicate to least fixed point in string format.
   * @param op String representation of fixed point type to be translated.
@@ -481,15 +455,6 @@ let describe_fixed_point op defs = function
     name op
     (describe_definitions defs)
     (describe_dependencies name defs decorate)
-
-(*
-  "Define " ^ name ^ " : (i -> bool) -> prop by\n" ^
-  name ^ " (" ^ op ^ " Pred\\Args\\\n" ^
-  describe_definitions defs ^
-  "\n)" ^
-  describe_dependencies name defs decorate ^
-  ".\n"
-*)
 
 let describe_define defs idtys = describe_fixed_point "mu" defs idtys
 let describe_codefine defs idtys = describe_fixed_point "nu" defs idtys
@@ -520,13 +485,6 @@ let describe_theorem name thm =
     name
     deps_str
     thm_str
-(*
-  "Define " ^ name ^ " : bool -> prop by\n" ^
-  name ^ " F :=\n" ^
-  deps_str ^  "F =\n" ^
-  thm_str ^
-  ".\n"
-*)
 
 (*******************************************************************************
  * Theorem proofs *
@@ -642,12 +600,6 @@ let append text file =
   let oc = open_out_gen [Open_creat; Open_text; Open_append] 0o640 file in
   output_string oc text ;
   close_out oc
-
-(* Gosh, top-level hiding doesn't make any sense!
-let describe_copy_i =
-  let (_, ctable) = !sign in
-  ctable |> List.map fst |> String.concat " "
-*)
 
 (*******************************************************************************
  * File generation *
@@ -815,7 +767,10 @@ let start_files () =
 
 (** Translate single command.
   * @param cmd Compiled command.
-  * @raise Unsupported commands and translation errors. *)
+  * @raise Unsupported commands and translation errors.
+  * @todo I am unsure that decomposing commands into individual arguments is
+  *   best, in fact I think it's the opposite.
+  * @todo Reconsider the whole string-to-file-dump structure. *)
 let process_command = function
 | CTheorem(id, mterm) ->
   append (describe_theorem id mterm) "fpc-thms.mod" ;
@@ -839,11 +794,6 @@ let process_commands () =
 (*******************************************************************************
  * Module interface *
  ********************)
-
-(*I'm unsure that decomposing the commands into their arguments is best*)
-(*There are much more elegant architectures. Ideally, I would translate the
-  parse tree into another target parse tree, and implement printing functions
-  for each of these components.*)
 
 (** Queue command for batch translation.
   * @param cmd Compiled command.
