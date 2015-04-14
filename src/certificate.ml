@@ -674,7 +674,8 @@ let describe_copy_i () =
     "Define copy_i : list imap -> i -> i -> prop by\n\
      %s\
      copy_i Theta argv argv ;\n\
-     copy_i Theta (X ++ Y) (U ++ V) := copy_i Theta X U /\\ copy_i Theta Y V."
+     copy_i Theta (X ++ Y) (U ++ V) := copy_i Theta X U /\\ copy_i Theta Y V ;\
+     \ncopy_i Theta X U := member (imap X U) Theta."
     body_str
 
 (** Pervasive predicate check.
