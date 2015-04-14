@@ -553,7 +553,7 @@ let describe_proof_stub pred_name =
 
   let proof_pred = proof_name pred_name in
   let pred_var = String.capitalize pred_name in
-  
+
   let decorate str = if String.length str = 0 then "" else  str ^ " /\\\n" in
   let lemmas =
     get_lemma_names pred_name |>
@@ -709,7 +709,7 @@ let describe_name_mnu () =
     List.filter (fun x -> not (is_pervasive x)) in
 
   (* Treat empty predicate list. *)
-  let def_nopreds = 
+  let def_nopreds =
     "Define name_mnu : string -> (i -> bool) -> prop by name_mnu _ _ := false."
 
   (* Treat nonempty predicate list. *)
@@ -719,7 +719,7 @@ let describe_name_mnu () =
       sprintf "name_mnu \"%s\" %s := %s %s" pred predvar pred predvar in
     let body = preds |> List.map map_name_mnu |> String.concat " ;\n" in
     sprintf "Define name_mnu : string -> (i -> bool) -> prop by\n%s." body in
-  
+
   if List.length preds = 0 then def_nopreds else def_preds preds
 
 (** Signature file.
@@ -791,7 +791,7 @@ let process_commands () =
   !commands |>
   List.rev |>
   List.iter process_command
-  
+
 (*******************************************************************************
  * Module interface *
  ********************)
