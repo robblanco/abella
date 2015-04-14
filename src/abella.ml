@@ -337,31 +337,31 @@ let import filename =
           (function
              | CTheorem(name, thm) ->
                  add_lemma name thm ;
-                 Certificate.register (CTheorem(name, thm)) ; (*RB*)
+                 Certificate.register (CTheorem(name, thm)) ;
              | CDefine(idtys, defs) ->
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
                    add_global_consts idtys ;
                    add_defs ids Inductive defs ;
-                   Certificate.register (CDefine(idtys, defs)) ; (*RB*)
+                   Certificate.register (CDefine(idtys, defs)) ;
              | CCoDefine(idtys, defs) ->
                  let ids = List.map fst idtys in
                    check_noredef ids;
                    check_defs ids defs ;
                    add_global_consts idtys ;
                    add_defs ids CoInductive defs ;
-                   Certificate.register (CCoDefine(idtys, defs)) ; (*RB*)
+                   Certificate.register (CCoDefine(idtys, defs)) ;
              | CImport(filename) ->
                  aux filename
              | CKind(ids) ->
                  check_noredef ids;
                  add_global_types ids ;
-                 Certificate.register (CKind(ids)) ; (*RB*)
+                 Certificate.register (CKind(ids)) ;
              | CType(ids, ty) ->
                  check_noredef ids;
                  add_global_consts (List.map (fun id -> (id, ty)) ids) ;
-                 Certificate.register (CType(ids, ty)) ; (*RB*)
+                 Certificate.register (CType(ids, ty)) ;
              | CClose(ty_subords) ->
                  List.iter
                    (fun (ty, prev) ->
@@ -590,15 +590,7 @@ let rec process () =
                 process_proof name ;
                 compile (CTheorem(name, thm)) ;
                 add_lemma name thm ;
-                Certificate.register (CTheorem(name, thm)) ; (*RB*)
-
-let (_, ctable) = !sign in
-ctable |>
-List.filter (fun (_, Poly(_, Ty(_, base))) -> not (List.exists (fun x -> x = base) (fst pervasive_sign))) |>
-List.map (fun (name, Poly(_, Ty(args, _))) -> (name, List.length args)) |>
-List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
-(*!lemmas |> List.map fst |> List.iter (fun x -> Printf.eprintf "%s\n%!" x) ;*)
-
+                Certificate.register (CTheorem(name, thm)) ;
               with AbortProof -> () end
         | SSplit(name, names) ->
             let thms = create_split_theorems name names in
@@ -617,7 +609,7 @@ List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
                 commit_global_consts local_sr local_sign ;
                 compile (CDefine(idtys, defs)) ;
                 add_defs ids Inductive defs ;
-                Certificate.register (CDefine(idtys, defs)) ; (*RB*)
+                Certificate.register (CDefine(idtys, defs)) ;
         | CoDefine(idtys, udefs) ->
             let ids = List.map fst idtys in
               check_noredef ids;
@@ -627,7 +619,7 @@ List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
                 commit_global_consts local_sr local_sign ;
                 compile (CCoDefine(idtys, defs)) ;
                 add_defs ids CoInductive defs ;
-                Certificate.register (CCoDefine(idtys, defs)) ; (*RB*)
+                Certificate.register (CCoDefine(idtys, defs)) ;
         | TopCommon(Set(k, v)) ->
             set k v
         | TopCommon(Show(n)) ->
@@ -649,12 +641,12 @@ List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
             check_noredef ids;
             add_global_types ids ;
             compile (CKind ids) ;
-            Certificate.register (CKind(ids)) ; (*RB*)
+            Certificate.register (CKind(ids)) ;
         | Type(ids, ty) ->
             check_noredef ids;
             add_global_consts (List.map (fun id -> (id, ty)) ids) ;
             compile (CType(ids, ty)) ;
-            Certificate.register (CType(ids, ty)) ; (*RB*)
+            Certificate.register (CType(ids, ty)) ;
         | Close(ids) ->
             close_types ids ;
             compile
@@ -676,7 +668,7 @@ List.iter (fun (name, argc) -> Printf.eprintf "%s %d\n%!" name argc) ;
         if !switch_to_interactive then
           perform_switch_to_interactive ()
         else begin
-          Certificate.certify () ; (*RB*)
+          Certificate.certify () ;
           fprintf !out "Goodbye.\n%!" ;
           ensure_finalized_specification () ;
           write_compilation () ;
