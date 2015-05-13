@@ -584,7 +584,9 @@ let describe_proof_stub pred_name =
   * @return String assertion for the proof predicate associated to the given
   *   theorem predicate. *)
 let describe_proof_check pred_name =
-  sprintf "#assert %s\n**your certificate here**\n.\n" (proof_name pred_name)
+  sprintf
+    "#assert %s (induction 3 2 2 2 2). %% **your certificate here**\n\n"
+    (proof_name pred_name)
 
 (*******************************************************************************
  * Output file manipulation *
@@ -743,11 +745,11 @@ let describe_signature () =
   *   This goes at the top of the test file (i.e., the only file that the user
   * needs to interact with). *)
 let describe_kernel () =
-  "#include \"logic.thm\".\n\
-   #include \"cert-sig.thm\".\n\
-   #include \"admin-fpc.thm\".\n\
+  "#include \"../kernel/logic.mod\".\n\
+   #include \"../kernel/cert.sig\".\n\
+   #include \"../fpc/simple-fpc.mod\".\n\
    #include \"fpc-sign.mod\".\n\
-   #include \"kernel.thm\".\n\
+   #include \"../kernel/kernel.mod\".\n\
    #include \"fpc-thms.mod\".\n\
    \n"
 
