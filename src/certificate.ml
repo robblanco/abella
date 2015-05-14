@@ -728,7 +728,7 @@ let describe_name_mnu () =
   * @return File contents as string. *)
 let describe_signature () =
   sprintf
-    "#include \"fpc-decl.mod\".\n\
+    "#include \"fpc-decl.thm\".\n\
      \n\
      %s\n\
      \n\
@@ -748,9 +748,9 @@ let describe_kernel () =
   "#include \"../kernel/logic.thm\".\n\
    #include \"../kernel/cert-sig.thm\".\n\
    #include \"../fpc/simple-fpc.thm\".\n\
-   #include \"fpc-sign.mod\".\n\
+   #include \"fpc-sign.thm\".\n\
    #include \"../kernel/kernel.thm\".\n\
-   #include \"fpc-thms.mod\".\n\
+   #include \"fpc-thms.thm\".\n\
    \n"
 
 (** Start translation initializing output files.
@@ -761,8 +761,8 @@ let describe_kernel () =
   * at the beginning, but it becomes trickier in practice).
   * @todo Clear files at the top. *)
 let start_files () =
-  append (describe_signature ()) "fpc-sign.mod" ;
-  append (describe_kernel ()) "fpc-test.mod"
+  append (describe_signature ()) "fpc-sign.thm" ;
+  append (describe_kernel ()) "fpc-test.thm"
 
 (*******************************************************************************
  * Command processing *
@@ -776,15 +776,15 @@ let start_files () =
   * @todo Reconsider the whole string-to-file-dump structure. *)
 let process_command = function
 | CTheorem(id, mterm) ->
-  append (describe_theorem id mterm) "fpc-thms.mod" ;
-  append (describe_proof_stub id) "fpc-thms.mod" ;
-  append (describe_proof_check id) "fpc-test.mod"
+  append (describe_theorem id mterm) "fpc-thms.thm" ;
+  append (describe_proof_stub id) "fpc-thms.thm" ;
+  append (describe_proof_check id) "fpc-test.thm"
 | CDefine(idtys, defs) ->
-  append (describe_define defs idtys) "fpc-decl.mod"
+  append (describe_define defs idtys) "fpc-decl.thm"
 | CCoDefine(idtys, defs) ->
-  append (describe_codefine defs idtys) "fpc-decl.mod"
+  append (describe_codefine defs idtys) "fpc-decl.thm"
 | CType(ids, ty) ->
-  append (describe_type ids ty) "fpc-decl.mod"
+  append (describe_type ids ty) "fpc-decl.thm"
 | CKind(_) | CImport(_) | CClose(_) -> failwith "unsupported command"
 
 (** Process command queue in chronological order.
@@ -816,12 +816,12 @@ let register cmd = match cmd with
   * can be fed into the proof checker using the "standard" administrative FPC
   * architecture. At the moment filenames are hardwired. The files being
   * generated and their contents are: {
-  *   {- fpc-decl.mod: type constructores and predicate declarations.}
-  *   {- fpc-sign.mod: signature of the declarations, automatically derived from
+  *   {- fpc-decl.thm: type constructores and predicate declarations.}
+  *   {- fpc-sign.thm: signature of the declarations, automatically derived from
   *      these and used by the kernel and for debugging. It includes the
   *      declarations file for further uses and defines copy_i and name_mnu.}
-  *   {- fpc-thms.mod: encoded theorems and their associated proof predicates.}
-  *   {- fpc-test.mod: assembly of all previous files and assertion stubs for
+  *   {- fpc-thms.thm: encoded theorems and their associated proof predicates.}
+  *   {- fpc-test.thm: assembly of all previous files and assertion stubs for
   *      proof predicates. Certificates need to be filled out, but everything is
   *      otherwise "plug and play".}}
   * @raise Unsupported structures present in the list (may still produce a
