@@ -525,7 +525,7 @@ let get_lemma_names pred_name =
 let describe_lemma_list lemmas =
   let prepend_lemma_descr lemma_name descr =
     let lemma_var = String.capitalize lemma_name in
-    sprintf "(lemma (name \"%s\") %s) :: %s" lemma_name lemma_var descr in
+    sprintf "(lemma (idx \"%s\") %s) :: %s" lemma_name lemma_var descr in
   List.fold_right prepend_lemma_descr lemmas "nil"
 
 (** Name of the proof predicate for a given theorem predicate.
