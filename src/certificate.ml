@@ -745,11 +745,11 @@ let describe_signature () =
   *   This goes at the top of the test file (i.e., the only file that the user
   * needs to interact with). *)
 let describe_kernel () =
-  "#include \"../kernel/logic.mod\".\n\
-   #include \"../kernel/cert.sig\".\n\
-   #include \"../fpc/simple-fpc.mod\".\n\
+  "#include \"../kernel/logic.thm\".\n\
+   #include \"../kernel/cert-sig.thm\".\n\
+   #include \"../fpc/simple-fpc.thm\".\n\
    #include \"fpc-sign.mod\".\n\
-   #include \"../kernel/kernel.mod\".\n\
+   #include \"../kernel/kernel.thm\".\n\
    #include \"fpc-thms.mod\".\n\
    \n"
 
