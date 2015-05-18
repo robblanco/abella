@@ -809,6 +809,8 @@ let register cmd = match cmd with
 | CKind(_) -> ()
 | CImport(_) | CClose(_) -> failwith "unsupported command"
 
+let ship name cert = ()
+
 (** Translate the queue of stored commands into a standard set of files for
   * consumption of the checker.
   *   At least part of the translation must be triggered by one such command.

@@ -98,7 +98,7 @@
 
 %token IMP IF COMMA DOT BSLASH LPAREN RPAREN TURN CONS EQ TRUE FALSE DEFEQ
 %token IND INST APPLY CASE FROM SEARCH TO ON WITH INTROS CUT ASSERT CLAUSEEQ
-%token SKIP UNDO ABORT COIND LEFT RIGHT MONOTONE IMPORT BY
+%token SKIP SHIP UNDO ABORT COIND LEFT RIGHT MONOTONE IMPORT BY
 %token SPLIT SPLITSTAR UNFOLD ALL KEEP CLEAR SPECIFICATION SEMICOLON
 %token THEOREM DEFINE PLUS CODEFINE SET ABBREV UNABBREV QUERY SHOW
 %token PERMUTE BACKCHAIN QUIT UNDERSCORE AS SSPLIT RENAME
@@ -168,6 +168,7 @@ id:
   | FROM          { "from" }
   | ASSERT        { "assert" }
   | SKIP          { "skip" }
+  | SHIP          { "ship" }
   | WITNESS       { "witness" }
   | UNDO          { "undo" }
   | ABORT         { "abort" }
@@ -466,6 +467,8 @@ pure_command:
     { Types.Intros($2) }
   | SKIP DOT
     { Types.Skip }
+  | SHIP QSTRING DOT
+    { Types.Ship($2) }
   | ABORT DOT
     { Types.Abort }
   | UNDO DOT

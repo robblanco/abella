@@ -102,6 +102,7 @@ type command =
   | Intros of id list
   | Unfold of clause_selector * solution_selector
   | Skip
+  | Ship of string
   | Abort
   | Undo
   | Common of common_command
@@ -311,6 +312,9 @@ let command_to_string c =
     | Intros [] -> "intros"
     | Intros ids -> sprintf "intros %s" (String.concat " " ids)
     | Skip -> "skip"
+    | Ship cert_str ->
+        sprintf "ship %s"
+          cert_str
     | Abort -> "abort"
     | Undo -> "undo"
     | Common(cc) -> common_command_to_string cc

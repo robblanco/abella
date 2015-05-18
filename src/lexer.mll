@@ -67,6 +67,7 @@
     "unfold",        UNFOLD ;
     "intros",        INTROS ;
     "skip",          SKIP ;
+    "ship",          SHIP ;
     "abort",         ABORT ;
     "undo",          UNDO ;
     "assert",        ASSERT ;
