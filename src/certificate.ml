@@ -47,6 +47,11 @@ open Typing
   * order. *)
 let commands : compiled list ref = ref []
 
+(** List of certificates associated to proof obligations exported by the 'ship'
+  * tactic. For now, a very simple association list from names to certificate
+  * strings. *)
+let certificates : (string * string) list ref = ref []
+
 (*******************************************************************************
  * Helpers *
  ***********)
@@ -579,14 +584,21 @@ let describe_proof_stub pred_name =
     pred_var
     (describe_lemma_list lemmas)
 
-(** Assert proof predicate, with certificate placeholder.
+(** Assert proof predicate, with certificate placeholder if the proof was
+  * skipped, or the shipped certificate if that tactic was applied.
   * @param pred_name Name of the theorem predicate.
   * @return String assertion for the proof predicate associated to the given
   *   theorem predicate. *)
 let describe_proof_check pred_name =
+  let cert_str =
+  try
+    List.assoc pred_name !certificates
+  with
+  | Not_found -> "(induction 3 2 2 2 2)" in
   sprintf
-    "#assert %s (induction 3 2 2 2 2). %% **your certificate here**\n\n"
+    "#assert %s %s.\n\n"
     (proof_name pred_name)
+    cert_str
 
 (*******************************************************************************
  * Output file manipulation *
@@ -810,7 +822,7 @@ let register cmd = match cmd with
 | CImport(_) | CClose(_) -> failwith "unsupported command"
 
 let ship name cert =
-  printf "Shipping %s with %s\n" name cert
+  certificates := (name, cert) :: !certificates
 
 (** Translate the queue of stored commands into a standard set of files for
   * consumption of the checker.
