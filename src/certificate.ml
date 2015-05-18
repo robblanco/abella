@@ -809,7 +809,8 @@ let register cmd = match cmd with
 | CKind(_) -> ()
 | CImport(_) | CClose(_) -> failwith "unsupported command"
 
-let ship name cert = ()
+let ship name cert =
+  printf "Shipping %s with %s\n" name cert
 
 (** Translate the queue of stored commands into a standard set of files for
   * consumption of the checker.

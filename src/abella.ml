@@ -520,7 +520,9 @@ let rec process_proof name =
           | Unfold (cs, ss) -> unfold cs ss
           | Intros hs -> intros hs
           | Skip -> skip ()
-          | Ship(str) -> Certificate.ship name str
+          | Ship(str) ->
+              Certificate.ship name str ;
+              skip ()
           | Abort -> raise AbortProof
           | Undo -> undo () ; undo () (* undo recent save, and previous save *)
           | Common(Set(k, v)) -> set k v
