@@ -822,7 +822,8 @@ let register cmd = match cmd with
 | CImport(_) | CClose(_) -> failwith "unsupported command"
 
 let ship name cert =
-  certificates := (name, cert) :: !certificates
+  let cert_trans = Str.global_replace (Str.regexp "'") "\"" cert in
+  certificates := (name, cert_trans) :: !certificates
 
 (** Translate the queue of stored commands into a standard set of files for
   * consumption of the checker.
