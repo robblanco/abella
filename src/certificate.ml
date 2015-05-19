@@ -584,21 +584,19 @@ let describe_proof_stub pred_name =
     pred_var
     (describe_lemma_list lemmas)
 
-(** Assert proof predicate, with certificate placeholder if the proof was
-  * skipped, or the shipped certificate if that tactic was applied.
+(** Assert proof predicate if a corresponding certificate for the theorem was
+  * shipped. If it was skipped, a commented placeholder is generated instead.
   * @param pred_name Name of the theorem predicate.
   * @return String assertion for the proof predicate associated to the given
   *   theorem predicate. *)
 let describe_proof_check pred_name =
-  let cert_str =
+  let proof_name_str = (proof_name pred_name) in
   try
-    List.assoc pred_name !certificates
+    let cert_str = List.assoc pred_name !certificates in
+    sprintf "#assert %s %s.\n\n" proof_name_str cert_str
   with
-  | Not_found -> "(induction 3 2 2 2 2)" in
-  sprintf
-    "#assert %s %s.\n\n"
-    (proof_name pred_name)
-    cert_str
+  | Not_found ->
+    sprintf "%%#assert %s **your certificate here**.\n\n" proof_name_str
 
 (*******************************************************************************
  * Output file manipulation *
