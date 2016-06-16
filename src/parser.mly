@@ -684,8 +684,8 @@ pure_top_command:
     { Types.Import($2, []) }
   | IMPORT QSTRING WITH import_withs DOT
     { Types.Import($2, $4) }
-  | SPECIFICATION QSTRING DOT
-    { Types.Specification($2) }
+  | SPECIFICATION maybe_namespace QSTRING DOT
+    { Types.Specification($3, $2) }
   | KKIND id_list TYPE DOT
     { Types.Kind(List.map deloc_id $2) }
   | TTYPE id_list ty DOT
@@ -702,6 +702,12 @@ import_withs:
     { [$1, $3] }
   | id DEFEQ id COMMA import_withs
     { ($1, $3) :: $5 }
+
+maybe_namespace:
+  | STRINGID DEFEQ
+    { Some $1 }
+  |
+    { None }
 
 common_command:
   | SET id id DOT

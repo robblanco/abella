@@ -682,7 +682,7 @@ and process_top1 () =
   | Import(filename, withs) ->
       compile (CImport (filename, withs)) ;
       import (normalize_filename filename) withs;
-  | Specification(filename) ->
+  | Specification(filename, namespace_option) ->
       if !can_read_specification then begin
         read_specification (normalize_filename filename) ;
         ensure_finalized_specification ()

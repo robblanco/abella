@@ -66,7 +66,7 @@ type top_command =
   | Theorem of id * string list * umetaterm
   | Define of flavor * tyctx * udef_clause list
   | Import of string * (string * string) list
-  | Specification of string
+  | Specification of string * string option
   | Query of umetaterm
   | Kind of id list
   | Type of id list * ty
@@ -258,8 +258,11 @@ let top_command_to_string tc =
           (withs |>
            List.map (fun (a, b) -> a ^ " := " ^ b) |>
            String.concat ", ")
-    | Specification filename ->
-        sprintf "Specification \"%s\"" filename
+    | Specification(filename, namespace_option) ->
+        let namespace_str = (match namespace_option with
+          | None -> ""
+          | Some namespace -> namespace ^ " := ") in
+        sprintf "Specification %s\"%s\"" namespace_str filename
     | Query q ->
         sprintf "Query %s" (umetaterm_to_formatted_string q)
     | Kind ids ->
