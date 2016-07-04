@@ -729,6 +729,9 @@ let rec has_capital_head t =
 let sign = State.rref
   [(None, pervasive_sign);
    (Some "!dummy", pervasive_sign)] (*TODO Better typing without a dummy. *)
-let sr = State.rref pervasive_sr
+let sr = State.rref
+  [(None, pervasive_sr);
+   (Some "!dummy", pervasive_sr)]
 
 let default_sign () = List.assoc None !sign
+let default_sr () = List.assoc None !sr

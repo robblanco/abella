@@ -127,13 +127,13 @@ let read_specification name space_option =
   let () = warn_on_teyjus_only_keywords read_sign in (*NOTE Looks safe. *)
   let default_sign = default_sign () in
   let sign' = merge_signs [default_sign; read_sign] in (*TODO Find and initialize by namespace. *)
-  let sr' = update_subordination_sign !sr read_sign in (*TODO Also safe, except global !sr. *)
+  let sr' = update_subordination_sign (default_sr ()) read_sign in (*TODO Same as above. *)
   let clauses' = get_clauses ~sr:sr' name in (*NOTE Looks safe. *)
   (* Any exceptions must have been thrown by now - do actual assignments *)
   (*TODO begin*)
-  sr := sr' ;
-  let remov_sign = List.remove_assoc None !sign in (*TODO By namespace, although no rewrites? *)
-  sign := (None, sign') :: remov_sign ;
+  let remove_sr = List.remove_assoc None !sr in sr := (None, sr') :: remove_sr ;
+  let remove_sign = List.remove_assoc None !sign in (*TODO By namespace, although no rewrites? *)
+  sign := (None, sign') :: remove_sign ;
   add_clauses clauses'
   (*TODO end*)
 
@@ -368,8 +368,8 @@ let import filename withs =
                     let open Typing in
                     let pred_name = List.assoc id withs in
                     let pred = UCon (ghost, pred_name, Term.fresh_tyvar ()) in
-                    (*NOTE Here too, default sign is probably OK. *)
-                    let pred = type_uterm ~sr:!sr ~sign:(default_sign ()) ~ctx:[] pred in
+                    (*NOTE Here too, default sign/sr is probably OK. *)
+                    let pred = type_uterm ~sr:(default_sr ()) ~sign:(default_sign ()) ~ctx:[] pred in
                     let pred_ty = tc [] pred in
                     tid_ensure_fully_inferred ~sign:(default_sign ()) (pred_name, pred_ty) ; (*NOTE Also likely OK. *)
                     if ty <> pred_ty then
@@ -390,7 +390,7 @@ let import filename withs =
             | CClose(ty_subords) ->
                 List.iter
                   (fun (ty, prev) ->
-                     let curr = Subordination.subordinates !sr ty in
+                     let curr = Subordination.subordinates (default_sr ()) ty in (*NOTE OK? same as Close *)
                      match List.minus curr prev with
                      | [] -> ()
                      | xs ->
@@ -418,7 +418,7 @@ let import filename withs =
 let query q =
   let fv = ids_to_fresh_tyctx (umetaterm_extract_if is_capital_name q) in
   let ctx = fresh_alist ~tag:Logic ~used:[] fv in
-  match type_umetaterm ~sr:!sr ~sign:(default_sign ()) ~ctx (UBinding(Metaterm.Exists, fv, q)) with (*TODO ? *)
+  match type_umetaterm ~sr:(default_sr ()) ~sign:(default_sign ()) ~ctx (UBinding(Metaterm.Exists, fv, q)) with (*TODO ?, both sign and sr *)
   | Binding(Metaterm.Exists, fv, q) ->
       let support = metaterm_support q in
       let ctx = Tactics.fresh_nameless_alist ~support ~ts:0 ~tag:Logic fv in
@@ -661,7 +661,7 @@ and process_top1 () =
             (List.find (fun t -> List.mem t basics) tys) ;
         (tys @ basics, consts)
       in
-      let thm = type_umetaterm ~sr:!sr ~sign:tsign thm in
+      let thm = type_umetaterm ~sr:(default_sr ()) ~sign:tsign thm in (*NOTE OK? *)
       check_theorem thm ;
       theorem thm ;
       let oldsign = default_sign () in (*NOTE OK? *)
@@ -720,7 +720,7 @@ and process_top1 () =
       compile (CType(ids, ty))
   | Close(ids) ->
       close_types ids ;
-      compile (CClose(List.map (fun id -> (id, Subordination.subordinates !sr id)) ids))
+      compile (CClose(List.map (fun id -> (id, Subordination.subordinates (default_sr ()) id)) ids)) (*NOTE OK? *)
   end ;
   if !interactive then flush stdout ;
   fprintf !out "\n%!"

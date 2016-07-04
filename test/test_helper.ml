@@ -19,13 +19,13 @@ let parse_top_command str =
   Parser.top_command Lexer.token (Lexing.from_string str)
 
 let parse_metaterm ?(ctx=[]) str =
-  type_umetaterm ~sr:!sr ~sign:(default_sign ()) ~ctx (parse_umetaterm str) (*NOTE OK? *)
+  type_umetaterm ~sr:(default_sr ()) ~sign:(default_sign ()) ~ctx (parse_umetaterm str) (*NOTE OK? *)
 
 let parse_uclauses str =
   Parser.mod_body Lexer.token (Lexing.from_string str)
 
 let parse_clauses str =
-  List.map (type_uclause ~sr:!sr ~sign:(default_sign ())) (parse_uclauses str) (*NOTE OK? *)
+  List.map (type_uclause ~sr:(default_sr ()) ~sign:(default_sign ())) (parse_uclauses str) (*NOTE OK? *)
 
 let parse_decls str =
   Parser.sig_body Lexer.token (Lexing.from_string str)
@@ -34,7 +34,7 @@ let parse_udefs str =
   Parser.defs Lexer.token (Lexing.from_string str)
 
 let parse_defs str =
-  type_udefs ~sr:!sr ~sign:(default_sign ()) (parse_udefs str) |> (*NOTE OK? *)
+  type_udefs ~sr:(default_sr ()) ~sign:(default_sign ()) (parse_udefs str) |> (*NOTE OK? *)
   List.map (fun (head, body) -> Abella_types.{head; body})
 
 let eval_sig_string = "\
@@ -58,10 +58,13 @@ let process_decls decls =
   let default' = List.fold_left add_decl (default_sign ()) decls in (*NOTE OK? *)
   let sign' = List.remove_assoc None !sign in
   sign := (None, default') :: sign' ;
-  sr := List.fold_left Subordination.update !sr
+  (*NOTE Also OK? *)
+  let default' = List.fold_left Subordination.update (default_sr ())
     (List.filter_map
        (function Abella_types.SType(ids, ty) -> Some ty | _ -> None)
-       decls)
+       decls) in
+  let sr' = List.remove_assoc None !sr in
+  sr := (None, default') :: sr'
 
 let () = process_decls (parse_decls eval_sig_string)
 
@@ -128,7 +131,7 @@ let freshen str =
   in
   let ctx = fresh_alist ~tag:Term.Eigen ~used:[] fv in
   match
-    type_umetaterm ~sr:!sr ~sign:(default_sign ()) ~ctx (*NOTE OK? *)
+    type_umetaterm ~sr:(default_sr ()) ~sign:(default_sign ()) ~ctx (*NOTE OK? *)
       (UBinding(Metaterm.Forall, fv, uterm))
   with
     | Binding(Metaterm.Forall, fv, body) ->
