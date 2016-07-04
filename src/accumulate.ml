@@ -74,6 +74,7 @@ let add_decl sign = function
       check_spec_logic_type ty ;
       add_consts sign (List.map (fun id -> (id, ty)) ids)
 
+(*TODO Looks OK for now, may want to refine use of pervasive_sign by default. *)
 let rec get_sign_accum_sigs filename =
   try match H.find sig_cache filename with
     | None -> failwith ("Cyclic dependency in signature " ^ filename)

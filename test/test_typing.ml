@@ -35,7 +35,7 @@ let tests =
            in
              assert_raises
                (Failure "Cannot quantify over type o in the specification logic")
-               (fun () -> type_uclause ~sr:!sr ~sign:!sign uclause)
+               (fun () -> type_uclause ~sr:!sr ~sign:(default_sign ()) uclause) (*NOTE OK? *)
         );
 
       "Should not allow quantification over prop in definition" >::
@@ -45,7 +45,7 @@ let tests =
            in
              assert_raises
                (Failure "Cannot quantify over type prop")
-               (fun () -> type_udef ~sr:!sr ~sign:!sign udef)
+               (fun () -> type_udef ~sr:!sr ~sign:(default_sign ()) udef) (*NOTE OK? *)
         );
 
       "Should not allow quantification over prop in metaterm" >::
@@ -55,7 +55,7 @@ let tests =
            in
              assert_raises
                (Failure "Cannot quantify over type prop")
-               (fun () -> type_umetaterm ~sr:!sr ~sign:!sign umetaterm)
+               (fun () -> type_umetaterm ~sr:!sr ~sign:(default_sign ()) umetaterm) (*NOTE OK? *)
         );
 
       "Should replace underscores in clauses with fresh names" >::
@@ -65,7 +65,7 @@ let tests =
               uapp (ucon "p1") (ucon "X"),
               [uapp (uapp (ucon "pr") (ucon "_")) (ucon "_")])
            in
-             let clause = type_uclause ~sr:!sr ~sign:!sign uclause in
+             let clause = type_uclause ~sr:!sr ~sign:(default_sign ()) uclause in (*NOTE OK? *)
              match Metaterm.clausify clause with
                | [_, _, p::_] ->
                    assert_term_pprint_equal "pr X1 X2" p

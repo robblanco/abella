@@ -19,13 +19,13 @@ let parse_top_command str =
   Parser.top_command Lexer.token (Lexing.from_string str)
 
 let parse_metaterm ?(ctx=[]) str =
-  type_umetaterm ~sr:!sr ~sign:!sign ~ctx (parse_umetaterm str)
+  type_umetaterm ~sr:!sr ~sign:(default_sign ()) ~ctx (parse_umetaterm str) (*NOTE OK? *)
 
 let parse_uclauses str =
   Parser.mod_body Lexer.token (Lexing.from_string str)
 
 let parse_clauses str =
-  List.map (type_uclause ~sr:!sr ~sign:!sign) (parse_uclauses str)
+  List.map (type_uclause ~sr:!sr ~sign:(default_sign ())) (parse_uclauses str) (*NOTE OK? *)
 
 let parse_decls str =
   Parser.sig_body Lexer.token (Lexing.from_string str)
@@ -34,7 +34,7 @@ let parse_udefs str =
   Parser.defs Lexer.token (Lexing.from_string str)
 
 let parse_defs str =
-  type_udefs ~sr:!sr ~sign:!sign (parse_udefs str) |>
+  type_udefs ~sr:!sr ~sign:(default_sign ()) (parse_udefs str) |> (*NOTE OK? *)
   List.map (fun (head, body) -> Abella_types.{head; body})
 
 let eval_sig_string = "\
@@ -55,7 +55,9 @@ let eval_clauses_string = "\
   eval (app M N) V :- eval M (abs R), eval (R N) V."
 
 let process_decls decls =
-  sign := List.fold_left add_decl !sign decls ;
+  let default' = List.fold_left add_decl (default_sign ()) decls in (*NOTE OK? *)
+  let sign' = List.remove_assoc None !sign in
+  sign := (None, default') :: sign' ;
   sr := List.fold_left Subordination.update !sr
     (List.filter_map
        (function Abella_types.SType(ids, ty) -> Some ty | _ -> None)
@@ -126,7 +128,7 @@ let freshen str =
   in
   let ctx = fresh_alist ~tag:Term.Eigen ~used:[] fv in
   match
-    type_umetaterm ~sr:!sr ~sign:!sign ~ctx
+    type_umetaterm ~sr:!sr ~sign:(default_sign ()) ~ctx (*NOTE OK? *)
       (UBinding(Metaterm.Forall, fv, uterm))
   with
     | Binding(Metaterm.Forall, fv, body) ->

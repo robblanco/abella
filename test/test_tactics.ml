@@ -498,7 +498,7 @@ let assert_expected_cases n cases =
 
 let add_to_itab itab id =
   let ty =
-    snd !Typing.sign |>
+    snd (Typing.default_sign ()) (*NOTE OK? // !Typing.sign*) |>
     List.assoc id |>
     (function Typing.Poly(_, ty) -> ty)
   in

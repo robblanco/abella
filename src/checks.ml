@@ -128,7 +128,7 @@ let check_theorem thm =
   ensure_no_restrictions thm
 
 let check_noredef ids =
-  let (_, ctable) = !sign in
+  let (_, ctable) = default_sign () in (*TODO*)
   List.iter begin fun id ->
     if List.mem id (List.map fst ctable)
     then failwithf "Predicate or constant %s already exists" id

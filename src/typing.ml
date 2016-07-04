@@ -725,5 +725,10 @@ let rec has_capital_head t =
 
 (** globals *)
 
-let sign = State.rref pervasive_sign
+(*TODO Detect and initialize (?) new namespaces. *)
+let sign = State.rref
+  [(None, pervasive_sign);
+   (Some "!dummy", pervasive_sign)] (*TODO Better typing without a dummy. *)
 let sr = State.rref pervasive_sr
+
+let default_sign () = List.assoc None !sign

@@ -70,24 +70,31 @@ let sequent =
     next_subgoal_id = 1 ;
   }
 
+(*NOTE Probably OK. *)
 let add_global_types tys =
-  sign := add_types !sign tys
+  let default' = add_types (default_sign ()) tys in
+  let sign' = List.remove_assoc None !sign in
+  sign := (None, default') :: sign'
 
 let locally_add_global_consts cs =
   let local_sr = List.fold_left Subordination.update !sr (List.map snd cs)
-  and local_sign = add_consts !sign cs
+  and local_sign = add_consts (default_sign ()) cs (*NOTE Probably OK. *)
   in (local_sr, local_sign)
 
 let commit_global_consts local_sr local_sign =
   sr := local_sr ;
-  sign := local_sign
+  (*NOTE Probably OK. *)
+  let sign' = List.remove_assoc None !sign in sign := (None, local_sign) :: sign'
 
 let add_global_consts cs =
   sr := List.fold_left Subordination.update !sr (List.map snd cs) ;
-  sign := add_consts !sign cs
+  (*NOTE Probably OK, possible parametric refactoring with add_global_types. *)
+  let default' = add_consts (default_sign ()) cs in
+  let sign' = List.remove_assoc None !sign in
+  sign := (None, default') :: sign'
 
 let close_types ids =
-  begin match List.minus ids (fst !sign) with
+  begin match List.minus ids (fst (default_sign ())) with (*TODO*)
   | [] -> ()
   | xs -> failwithf "Unknown type(s): %s" (String.concat ", " xs)
   end ;
@@ -159,7 +166,7 @@ let clauses : clause list ref = State.rref []
 let add_clauses new_clauses =
   clauses := !clauses @ new_clauses
 
-let parse_defs ?(sign = !sign) str =
+let parse_defs ?(sign = (default_sign ())) str = (*TODO*)
   Lexing.from_string str |>
   Parser.defs Lexer.token |>
   type_udefs ~sr:!sr ~sign |>
@@ -189,7 +196,8 @@ let add_defs typarams preds flavor clauses =
   List.iter (fun (id, _) -> H.add defs_table id def) preds
 
 let lookup_poly_const k =
-  try let Poly (typarams, ty) = List.assoc k (snd !sign) in (typarams, ty) with
+  try let Poly (typarams, ty) =
+    List.assoc k (snd (default_sign ())) in (typarams, ty) with (*TODO*)
   | Not_found -> failwithf "Unknown constant: %S" k
 
 let get_typarams idtys =
@@ -197,7 +205,7 @@ let get_typarams idtys =
     match ty with
     | Ty (argtys, targty) ->
         let tyvs = aux_tys tyvs argtys in
-        if List.mem targty (fst !sign) then tyvs
+        if List.mem targty (fst (default_sign ())) then tyvs (*TODO*)
         else Iset.add targty tyvs
   and aux_tys tyvs tys = List.fold_left aux_ty tyvs tys in
   idtys |> List.map snd |> aux_tys Iset.empty |> Iset.elements
@@ -207,14 +215,14 @@ let register_definition = function
       let typarams = get_typarams idtys in
       let ids = List.map fst idtys in
       check_noredef ids;
-      let (basics, consts) = !sign in
+      let (basics, consts) = default_sign () in
       let basics = typarams @ basics in
       let consts = List.map (fun (id, ty) -> (id, Poly ([], ty))) idtys @ consts in
       let clauses = type_udefs ~sr:!sr ~sign:(basics, consts) udefs |>
                     List.map (fun (head, body) -> {head ; body}) in
-      let (basics, consts) = !sign in
+      let (basics, consts) = default_sign () in
       let consts = List.map (fun (id, ty) -> (id, Poly (typarams, ty))) idtys @ consts in
-      sign := (basics, consts) ;
+      let sign' = List.remove_assoc None !sign in sign := (None, (basics, consts)) :: sign' ;
       add_defs typarams idtys flav clauses ;
       CDefine (flav, typarams, idtys, clauses)
   | _ -> bugf "Not a definition!"
@@ -607,7 +615,7 @@ let inst ?name h ws =
             let ctx = sequent.vars @
                       (List.map (fun (id, ty) -> (id, nominal_var id ty)) ntids)
             in
-            let t = type_uterm ~expected_ty:nty ~sr:!sr ~sign:!sign ~ctx t in
+            let t = type_uterm ~expected_ty:nty ~sr:!sr ~sign:(default_sign ()) ~ctx t in (*TODO*)
             aux ws (object_inst ht n t)
       in
       aux ws ht
@@ -628,7 +636,7 @@ let cut ?name h arg =
 
 (* Search *)
 
-let retype t = type_uterm ~sr:!sr ~sign:!sign ~ctx:sequent.vars t
+let retype t = type_uterm ~sr:!sr ~sign:(default_sign ()) ~ctx:sequent.vars t (*TODO*)
 
 let has_inductive_hyps hyp =
   let rec aux term =
@@ -747,7 +755,7 @@ let type_apply_withs stmt ws =
     (fun (id, t) ->
        try
          let ty = List.assoc id bindings in
-         (id, type_uterm ~expected_ty:ty ~sr:!sr ~sign:!sign ~ctx:sequent.vars t)
+         (id, type_uterm ~expected_ty:ty ~sr:!sr ~sign:(default_sign ()) ~ctx:sequent.vars t) (*TODO*)
        with
        | Not_found -> failwithf "Unknown variable %s" id)
     ws
@@ -796,7 +804,7 @@ let type_backchain_withs stmt ws =
     (fun (id, t) ->
        try
          let ty = List.assoc id bindings in
-         (id, type_uterm ~expected_ty:ty ~sr:!sr ~sign:!sign
+         (id, type_uterm ~expected_ty:ty ~sr:!sr ~sign:(default_sign ()) (*TODO*)
             ~ctx:(nctx @ sequent.vars) t)
        with
        | Not_found -> failwithf "Unknown variable %s" id)
@@ -960,7 +968,7 @@ let delay_mainline ?name ?depth new_hyp detour_goal =
   next_subgoal ()
 
 let assert_hyp ?name ?depth term =
-  let term = type_umetaterm ~sr:!sr ~sign:!sign ~ctx:sequent.vars term in
+  let term = type_umetaterm ~sr:!sr ~sign:(default_sign ()) ~ctx:sequent.vars term in (*TODO*)
   delay_mainline ?name ?depth term term
 
 (* Object logic monotone *)
@@ -973,7 +981,7 @@ let monotone h t =
       let ctx = sequent.vars @
                 (List.map (fun (id, ty) -> (id, nominal_var id ty)) ntids)
       in
-      let t = type_uterm ~expected_ty:olistty ~sr:!sr ~sign:!sign ~ctx t in
+      let t = type_uterm ~expected_ty:olistty ~sr:!sr ~sign:(default_sign ()) ~ctx t in (*TODO*)
       let new_obj = {obj with mode = Async ; context = Context.normalize [t]} in
       delay_mainline
         (Obj (new_obj, r))
@@ -1150,7 +1158,7 @@ let exists ew =
       let ctx = sequent.vars @
                 (List.map (fun (id, ty) -> (id, nominal_var id ty)) ntids)
       in
-      let t = type_uterm ~expected_ty:ty ~sr:!sr ~sign:!sign ~ctx t in
+      let t = type_uterm ~expected_ty:ty ~sr:!sr ~sign:(default_sign ()) ~ctx t in (*TODO*)
       let goal = replace_metaterm_vars [(id, t)] (exists tids body) in
       sequent.goal <- goal ;
       normalize_sequent ()
@@ -1281,7 +1289,7 @@ let permute_nominals ids form =
 (* Object level cut with explicit cut formula*)
 
 let cut_from ?name h arg term =
-  let term = type_uterm ~sr:!sr ~sign:!sign ~ctx:sequent.vars term in
+  let term = type_uterm ~sr:!sr ~sign:(default_sign ()) ~ctx:sequent.vars term in (*TODO*)
   let h = get_stmt_clearly h in
   let arg = get_stmt_clearly arg in
   match h, arg with
