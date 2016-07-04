@@ -36,7 +36,12 @@ let normalize_filename ?(wrt = !load_path) fn =
   then Filename.concat wrt fn
   else fn
 
-let can_read_specification = State.rref true
+(*NOTE The use of an immutable data structure in a reference will make things
+ * a bit more verbose for now. *)
+let can_read_specification = State.rref []
+
+let can_read_check namespace_option =
+  List.for_all (fun x -> not (x = namespace_option)) !can_read_specification
 
 let interactive = ref true
 let compile_out = ref None
@@ -109,12 +114,15 @@ let warn_on_teyjus_only_keywords (ktable, ctable) =
 let update_subordination_sign sr sign =
   List.fold_left Subordination.update sr (sign_to_tys sign)
 
-let read_specification name =
+let read_specification name space_option =
   clear_specification_cache () ;
-  fprintf !out "Reading specification %S%s\n%!" name
+  fprintf !out "Reading specification %S%s%s\n%!" name
     (if !load_path <> "." then
        sprintf " (from %S)" !load_path
-     else "") ;
+     else "")
+    (match space_option with
+     | Some space -> sprintf " in namespace %S" space
+     | None -> "") ;
   let read_sign = get_sign name in
   let () = warn_on_teyjus_only_keywords read_sign in
   let sign' = merge_signs [!sign; read_sign] in
@@ -137,15 +145,18 @@ let marshal citem =
   | Some cout -> Marshal.to_channel cout citem []
   | None -> ()
 
-let ensure_finalized_specification () =
-  if !can_read_specification then begin
-    can_read_specification := false ;
+let ensure_finalized_specification namespace_option =
+  if can_read_check namespace_option then begin
+    can_read_specification := namespace_option :: !can_read_specification ;
+    (*TODO begin*)
     comp_spec_sign := !sign ;
     comp_spec_clauses := !clauses
+    (*TODO end*)
   end
 
+(*TODO Currently default namespace only. *)
 let compile citem =
-  ensure_finalized_specification () ;
+  ensure_finalized_specification None ;
   comp_content := citem :: !comp_content
 
 let predicates (ktable, ctable) =
@@ -683,9 +694,10 @@ and process_top1 () =
       compile (CImport (filename, withs)) ;
       import (normalize_filename filename) withs;
   | Specification(filename, namespace_option) ->
-      if !can_read_specification then begin
-        read_specification (normalize_filename filename) ;
-        ensure_finalized_specification ()
+      if can_read_check namespace_option then begin
+        read_specification (normalize_filename filename) namespace_option ; (*TODO*)
+        ensure_finalized_specification namespace_option
+      (* This will only be triggered for the default namespace. *)
       end else
         failwith "Specification can only be read \
                  \ at the begining of a development."
