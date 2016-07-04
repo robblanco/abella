@@ -154,7 +154,7 @@ let ensure_finalized_specification namespace_option =
     can_read_specification := namespace_option :: !can_read_specification ;
     (*TODO begin*)
     comp_spec_sign := default_sign () ; (*TODO By namespace. *)
-    comp_spec_clauses := !clauses
+    comp_spec_clauses := default_clauses () (*TODO By namespace. *)
     (*TODO end*)
   end
 
@@ -213,7 +213,7 @@ let ensure_valid_import imp_spec_sign imp_spec_clauses imp_predicates =
 
   (* 3. Imported clauses must be a subset of clauses *)
   let missing_clauses =
-    List.minus ~cmp:clause_eq imp_spec_clauses !clauses
+    List.minus ~cmp:clause_eq imp_spec_clauses (default_clauses ()) (*TODO*)
   in
   let () = if missing_clauses <> [] then
       failwithf "Imported file makes reference to unknown clauses for: %s"
@@ -228,7 +228,7 @@ let ensure_valid_import imp_spec_sign imp_spec_clauses imp_predicates =
             clausify clause |>
             List.map (fun (_, h, _) -> term_head_name h) |>
             List.exists (fun h -> List.mem h imp_predicates))
-         !clauses)
+         (default_clauses ())) (*TODO*)
       imp_spec_clauses
   in
   let () = if extended_clauses <> [] then
@@ -418,7 +418,7 @@ let import filename withs =
 let query q =
   let fv = ids_to_fresh_tyctx (umetaterm_extract_if is_capital_name q) in
   let ctx = fresh_alist ~tag:Logic ~used:[] fv in
-  match type_umetaterm ~sr:(default_sr ()) ~sign:(default_sign ()) ~ctx (UBinding(Metaterm.Exists, fv, q)) with (*TODO ?, both sign and sr *)
+  match type_umetaterm ~sr:(default_sr ()) ~sign:(default_sign ()) ~ctx (UBinding(Metaterm.Exists, fv, q)) with (*TODO ?, both sign and sr and clauses *)
   | Binding(Metaterm.Exists, fv, q) ->
       let support = metaterm_support q in
       let ctx = Tactics.fresh_nameless_alist ~support ~ts:0 ~tag:Logic fv in
@@ -426,7 +426,7 @@ let query q =
       let _ = Tactics.search q
           ~depth:max_int
           ~hyps:[]
-          ~clauses:!clauses
+          ~clauses:(default_clauses ())
           ~def_unfold:Prover.def_unfold
           ~retype
           ~sc:(fun w ->

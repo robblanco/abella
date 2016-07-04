@@ -167,10 +167,17 @@ let normalize_sequent () =
 
 (* Clauses *)
 
-let clauses : clause list ref = State.rref []
+(*NOTE It is dubious that initializing None will be interesting, since we will
+ * need to create new entries sooner rather than later. *)
+let clauses : (string option * clause list) list ref = State.rref [(None, [])]
 
+let default_clauses () = List.assoc None !clauses
+
+(*TODO Namespace. *)
 let add_clauses new_clauses =
-  clauses := !clauses @ new_clauses
+  let clauses' = List.remove_assoc None !clauses in
+  let default' = (default_clauses ()) @ new_clauses in
+  clauses := (None, default') :: clauses'
 
 let parse_defs ?(sign = (default_sign ())) str = (*TODO*)
   Lexing.from_string str |>
@@ -481,12 +488,13 @@ let reset_prover =
     set_sequent original_sequent ;
     subgoals := []
 
+(*TODO esp. note use of defs_table. *)
 let full_reset_prover =
-  let original_clauses = !clauses in
+  let original_clauses = (default_clauses ()) in
   let original_defs_table = H.copy defs_table in
   fun () ->
     reset_prover () ;
-    clauses := original_clauses ;
+    let clauses' = List.remove_assoc None !clauses in clauses := (None, original_clauses) :: clauses' ; (*NOTE Not completely sure without reset_prover *)
     H.assign defs_table original_defs_table
 
 let add_hyp ?name term =
@@ -687,7 +695,7 @@ let search_goal_witness ?depth goal witness =
     Tactics.search
       ~depth:n
       ~hyps
-      ~clauses:!clauses
+      ~clauses:(default_clauses ()) (*NOTE Probably OK. *)
       ~def_unfold
       ~retype
       ~witness
@@ -860,7 +868,7 @@ let case ?name str =
   let term = get_stmt_clearly str in
   let (mutual, defs) = def_unfold term in
   let cases =
-    Tactics.case ~used:sequent.vars ~sr:(default_sr ()) ~clauses:!clauses (*NOTE Probably OK. *)
+    Tactics.case ~used:sequent.vars ~sr:(default_sr ()) ~clauses:(default_clauses ()) (*NOTE Probably OK. *)
       ~mutual ~defs ~global_support term
   in
   add_subgoals (List.map (case_to_subgoal ?name) cases) ;
