@@ -194,6 +194,7 @@ let k_member = "member"
 let k_cons = "::"
 let k_nil = "nil"
 
+type pervasive = string list * (string * pty) list
 let pervasive_sign =
   (["o"; "olist"; "prop"],
    [("pi",     Poly(["A"], tyarrow [tyarrow [tybase "A"] oty] oty)) ;
@@ -726,12 +727,10 @@ let rec has_capital_head t =
 (** globals *)
 
 (*TODO Detect and initialize (?) new namespaces. *)
-let sign = State.rref
-  [(None, pervasive_sign);
-   (Some "!dummy", pervasive_sign)] (*TODO Better typing without a dummy. *)
-let sr = State.rref
-  [(None, pervasive_sr);
-   (Some "!dummy", pervasive_sr)]
+let sign : (string option * pervasive) list ref =
+  State.rref [(None, pervasive_sign)]
+let sr : (string option * Subordination.sr) list ref =
+  State.rref [(None, pervasive_sr)]
 
 let default_sign () = List.assoc None !sign
 let default_sr () = List.assoc None !sr
