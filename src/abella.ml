@@ -131,9 +131,8 @@ let read_specification name space_option =
   let clauses' = get_clauses ~sr:sr' name in (*NOTE Looks safe. *)
   (* Any exceptions must have been thrown by now - do actual assignments *)
   (*TODO begin*)
-  let remove_sr = List.remove_assoc None !sr in sr := (None, sr') :: remove_sr ;
-  let remove_sign = List.remove_assoc None !sign in (*TODO By namespace, although no rewrites? *)
-  sign := (None, sign') :: remove_sign ;
+  update_sr None sr' ;
+  update_sign None sign' ; (*TODO By namespace, although no rewrites? *)
   add_clauses clauses'
   (*TODO end*)
 
@@ -349,9 +348,7 @@ let import filename withs =
                 (*NOTE Here, default sign is probably OK. *)
                 let (basics, consts) = (default_sign ()) in
                 let consts = List.map (fun (id, ty) -> (id, Poly (tyargs, ty))) idtys @ consts in
-                (*NOTE Refactor sign update. *)
-                let sign' = List.remove_assoc None !sign in
-                sign := (None, (basics, consts)) :: sign' ;
+                update_sign None (basics, consts) ;
                 add_defs tyargs idtys flav clauses ;
                 process_decls decls
             | CImport(filename, withs) ->
@@ -666,15 +663,15 @@ and process_top1 () =
       theorem thm ;
       let oldsign = default_sign () in (*NOTE OK? *)
       let thm_compile () =
-        let sign' = List.remove_assoc None !sign in sign := (None, oldsign) :: sign' ; (*TODO*)
+        update_sign None oldsign ; (*TODO*)
         compile (CTheorem(name, tys, thm)) ;
         add_lemma name tys thm
       in
       let thm_reset () =
-        let sign' = List.remove_assoc None !sign in sign := (None, oldsign) :: sign' ; (*TODO*)
+        update_sign None oldsign ; (*TODO*)
         reset_prover ()
       in
-      let sign' = List.remove_assoc None !sign in sign := (None, tsign) :: sign' ; (*TODO*)
+      update_sign None tsign ; (*TODO*)
       current_state := Process_proof {
           thm = name ;
           compile = thm_compile ;

@@ -734,3 +734,10 @@ let sr : (string option * Subordination.sr) list ref =
 
 let default_sign () = List.assoc None !sign
 let default_sr () = List.assoc None !sr
+
+let update_sign key value =
+  let tmp = List.remove_assoc key !sign in
+  sign := (key, value) :: tmp
+let update_sr key value =
+  let tmp = List.remove_assoc key !sr in
+  sr := (key, value) :: tmp

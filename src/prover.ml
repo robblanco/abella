@@ -73,8 +73,7 @@ let sequent =
 (*NOTE Probably OK. *)
 let add_global_types tys =
   let default' = add_types (default_sign ()) tys in
-  let sign' = List.remove_assoc None !sign in
-  sign := (None, default') :: sign'
+  update_sign None default'
 
 let locally_add_global_consts cs =
   let local_sr = List.fold_left Subordination.update (default_sr ()) (List.map snd cs) (*NOTE Probably OK. *)
@@ -83,19 +82,17 @@ let locally_add_global_consts cs =
 
 let commit_global_consts local_sr local_sign =
   (*NOTE Probably OK. *)
-  let sr' = List.remove_assoc None !sr in sr := (None, local_sr) :: sr' ;
+  update_sr None local_sr ;
   (*NOTE Probably OK. *)
-  let sign' = List.remove_assoc None !sign in sign := (None, local_sign) :: sign'
+  update_sign None local_sign
 
 let add_global_consts cs =
   (*NOTE Comment on !sign applies here too. *)
   let default' = List.fold_left Subordination.update (default_sr ()) (List.map snd cs) in
-  let sr' = List.remove_assoc None !sr in
-  sr := (None, default') :: sr' ;
+  update_sr None default' ;
   (*NOTE Probably OK, possible parametric refactoring with add_global_types. *)
   let default' = add_consts (default_sign ()) cs in
-  let sign' = List.remove_assoc None !sign in
-  sign := (None, default') :: sign'
+  update_sign None default'
 
 let close_types ids =
   begin match List.minus ids (fst (default_sign ())) with (*TODO*)
@@ -107,8 +104,7 @@ let close_types ids =
   | xs -> failwithf "Cannot close %s" (String.concat ", " xs)
   end ;
   let default' = Subordination.close (default_sr ()) ids in
-  let sr' = List.remove_assoc None !sr in
-  sr := (None, default') :: sr' (*TODO*)
+  update_sr None default' (*TODO*)
 
 let add_subgoals ?(mainline) new_subgoals =
   let extend_name i =
@@ -173,11 +169,14 @@ let clauses : (string option * clause list) list ref = State.rref [(None, [])]
 
 let default_clauses () = List.assoc None !clauses
 
+let update_clauses key value =
+  let tmp = List.remove_assoc key !clauses in
+  clauses := (key, value) :: tmp
+
 (*TODO Namespace. *)
 let add_clauses new_clauses =
-  let clauses' = List.remove_assoc None !clauses in
   let default' = (default_clauses ()) @ new_clauses in
-  clauses := (None, default') :: clauses'
+  update_clauses None default'
 
 let parse_defs ?(sign = (default_sign ())) str = (*TODO*)
   Lexing.from_string str |>
@@ -235,7 +234,7 @@ let register_definition = function
                     List.map (fun (head, body) -> {head ; body}) in
       let (basics, consts) = default_sign () in
       let consts = List.map (fun (id, ty) -> (id, Poly (typarams, ty))) idtys @ consts in
-      let sign' = List.remove_assoc None !sign in sign := (None, (basics, consts)) :: sign' ;
+      update_sign None (basics, consts) ;
       add_defs typarams idtys flav clauses ;
       CDefine (flav, typarams, idtys, clauses)
   | _ -> bugf "Not a definition!"
@@ -494,7 +493,7 @@ let full_reset_prover =
   let original_defs_table = H.copy defs_table in
   fun () ->
     reset_prover () ;
-    let clauses' = List.remove_assoc None !clauses in clauses := (None, original_clauses) :: clauses' ; (*NOTE Not completely sure without reset_prover *)
+    update_clauses None original_clauses ; (*NOTE Not completely sure without reset_prover *)
     H.assign defs_table original_defs_table
 
 let add_hyp ?name term =
