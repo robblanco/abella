@@ -114,26 +114,25 @@ let warn_on_teyjus_only_keywords (ktable, ctable) =
 let update_subordination_sign sr sign =
   List.fold_left Subordination.update sr (sign_to_tys sign)
 
-let read_specification name space_option =
+let read_specification name namespace =
   clear_specification_cache () ; (*NOTE Looks safe. *)
   fprintf !out "Reading specification %S%s%s\n%!" name
     (if !load_path <> "." then
        sprintf " (from %S)" !load_path
      else "")
-    (match space_option with
+    (match namespace with
      | Some space -> sprintf " in namespace %S" space
      | None -> "") ;
-  let read_sign = get_sign name in
-  let () = warn_on_teyjus_only_keywords read_sign in (*NOTE Looks safe. *)
-  let default_sign = default_sign () in
-  let sign' = merge_signs [default_sign; read_sign] in (*TODO Find and initialize by namespace. *)
-  let sr' = update_subordination_sign (default_sr ()) read_sign in (*TODO Same as above. *)
+  let name_sign = get_sign name in
+  let () = warn_on_teyjus_only_keywords name_sign in (*NOTE Looks safe. *)
+  let sign' = merge_signs [(read_sign namespace); name_sign] in (*TODO? Find and init by NS. *)
+  let sr' = update_subordination_sign (read_sr namespace) name_sign in (*TODO? Same as above. *)
   let clauses' = get_clauses ~sr:sr' name in (*NOTE Looks safe. *)
   (* Any exceptions must have been thrown by now - do actual assignments *)
   (*TODO begin*)
-  update_sr None sr' ;
-  update_sign None sign' ; (*TODO By namespace, although no rewrites? *)
-  add_clauses clauses'
+  update_sr namespace sr' ;
+  update_sign namespace sign' ; (*TODO? By namespace, although no rewrites? *)
+  add_clauses namespace clauses'
   (*TODO end*)
 
 
@@ -152,8 +151,9 @@ let ensure_finalized_specification namespace_option =
   if can_read_check namespace_option then begin
     can_read_specification := namespace_option :: !can_read_specification ;
     (*TODO begin*)
-    comp_spec_sign := default_sign () ; (*TODO By namespace. *)
-    comp_spec_clauses := default_clauses () (*TODO By namespace. *)
+    (*NOTE Actually, these may be of interest only for None. *)
+    comp_spec_sign := default_sign () ; (*TODO By namespace? *)
+    comp_spec_clauses := default_clauses () (*TODO By namespace? *)
     (*TODO end*)
   end
 

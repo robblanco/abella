@@ -169,14 +169,19 @@ let clauses : (string option * clause list) list ref = State.rref [(None, [])]
 
 let default_clauses () = List.assoc None !clauses
 
+let read_clauses key =
+  if List.mem_assoc key !clauses
+  then List.assoc key !clauses
+  else []
+
 let update_clauses key value =
   let tmp = List.remove_assoc key !clauses in
   clauses := (key, value) :: tmp
 
-(*TODO Namespace. *)
-let add_clauses new_clauses =
-  let default' = (default_clauses ()) @ new_clauses in
-  update_clauses None default'
+(*NOTE Namespace. *)
+let add_clauses namespace new_clauses =
+  let updated = (read_clauses namespace) @ new_clauses in
+  update_clauses namespace updated
 
 let parse_defs ?(sign = (default_sign ())) str = (*TODO*)
   Lexing.from_string str |>
