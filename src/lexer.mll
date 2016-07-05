@@ -23,7 +23,7 @@
   open Parser
   open Lexing
 
-  let keyword_table : (string, token) Hashtbl.t = Hashtbl.create 89 ;;
+  let keyword_table : (string, token) Hashtbl.t = Hashtbl.create 90 ;;
   let () = List.iter (fun (k, t) -> Hashtbl.add keyword_table k t) [
     "Close",         CLOSE ;
     "CoDefine",      CODEFINE ;
@@ -49,6 +49,7 @@
     "backchain",     BACKCHAIN ;
     "by",            BY ;
     "case",          CASE ;
+    "cert",          CERT ;
     "clear",         CLEAR ;
     "coinduction",   COIND ;
     "cut",           CUT ;

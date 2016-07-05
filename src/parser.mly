@@ -118,6 +118,7 @@
 %token COLON RARROW FORALL NABLA EXISTS WITNESS STAR AT HASH OR AND
 %token LBRACE RBRACE LBRACK RBRACK
 %token KIND TYPE KKIND TTYPE SIG MODULE ACCUMSIG ACCUM END CLOSE
+%token CERT
 
 %token <int> NUM
 %token <string> STRINGID QSTRING CLAUSENAME
@@ -523,6 +524,9 @@ pure_command:
     { Types.Permute($2, None) }
   | PERMUTE perm hyp DOT
     { Types.Permute($2, Some $3) }
+  /*TODO Term and namespace restrictions. */
+  | CERT term DOT
+    { Types.Cert($2) }
 
 hhint:
   | STRINGID COLON

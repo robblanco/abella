@@ -1315,3 +1315,9 @@ let cut_from ?name h arg term =
       add_hyp ?name (object_cut_from obj_h1 obj_h2 term)
   | _,_ -> failwith "The cut command can only be used on \
                    \ hypotheses of the form {...}"
+
+(* Certify *)
+
+(*TODO*)
+let cert term =
+  ()

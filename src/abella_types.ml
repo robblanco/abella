@@ -158,6 +158,7 @@ type command =
   | Right
   | Intros of id list
   | Unfold of clause_selector * solution_selector
+  | Cert of uterm
   | Skip
   | Abort
   | Undo
@@ -406,6 +407,7 @@ let command_to_string c =
            | Solution_all -> " (all)")
     | Intros [] -> "intros"
     | Intros ids -> sprintf "intros %s" (String.concat " " ids)
+    | Cert t -> sprintf "cert with %s" (uterm_to_string t)
     | Skip -> "skip"
     | Abort -> "abort"
     | Undo -> "undo"
