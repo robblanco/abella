@@ -1456,7 +1456,7 @@ let prop_to_bool (ktables, ctables) =
  * The following won't work out of the box for prop and o, needing bool or
  * whatever is defined as the object logic of the kernel. Terms, e.g., i,
  * could work. *)
-let cert term handle_witness =
+let cert ?depth ~term ~handle_witness () =
   (* Load variables for field, plus a copy of the original signature. *)
   let sr = default_sr ()
   and old_sign = default_sign ()
@@ -1484,9 +1484,8 @@ let cert term handle_witness =
   end in
   let ugoal = Parser.metaterm Lexer.token (Lexing.from_string goal_str) in
   let goal = Typing.type_umetaterm ~sr ~sign ~ctx ugoal in
-  (* A small variation on the search tactic, above.
-   * TODO: Refactor; consider other-than-default depth. *)
-  let search_result = search_goal_witness ?depth:(Some 500) goal WMagic in
+  (* A small variation on the search tactic, above. *)
+  let search_result = search_goal_witness ?depth goal WMagic in
   (* Restore original signature before proceeding. *)
   update_sign None old_sign ;
   (* Analyze result and finish. *)

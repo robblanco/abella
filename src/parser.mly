@@ -526,7 +526,9 @@ pure_command:
     { Types.Permute($2, Some $3) }
   /*TODO Term and namespace restrictions. */
   | CERT term DOT
-    { Types.Cert($2) }
+    { Types.Cert($2, None) }
+  | CERT term NUM DOT
+    { Types.Cert($2, Some $3) }
 
 hhint:
   | STRINGID COLON

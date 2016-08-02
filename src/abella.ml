@@ -625,7 +625,8 @@ and process_proof1 name =
   | Right                  -> right ()
   | Unfold (cs, ss)        -> unfold cs ss
   | Intros hs              -> intros hs
-  | Cert t                 -> cert t handle_search_witness
+  | Cert(term, depth)      ->
+      cert ?depth ~term ~handle_witness:handle_search_witness ()
   | Skip                   -> skip ()
   | Abort                  -> raise (End_proof `aborted)
   | Undo
