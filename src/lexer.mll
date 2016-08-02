@@ -49,7 +49,7 @@
     "backchain",     BACKCHAIN ;
     "by",            BY ;
     "case",          CASE ;
-    "cert",          CERT ;
+    "certify",       CERT ;
     "clear",         CLEAR ;
     "coinduction",   COIND ;
     "cut",           CUT ;

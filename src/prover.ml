@@ -1318,6 +1318,178 @@ let cut_from ?name h arg term =
 
 (* Certify *)
 
-(*TODO*)
-let cert term =
-  ()
+let rec metaterm_to_classical = function
+| True ->
+  "tt"
+| False ->
+  "ff"
+| Eq(left, right) ->
+  Format.sprintf "(eq %s %s)"
+    (term_to_string left)
+    (term_to_string right)
+| Arrow(left, right) ->
+  Format.sprintf "(imp %s %s)"
+    (metaterm_to_classical left)
+    (metaterm_to_classical right)
+| Or(left, right) ->
+  Format.sprintf "(or %s %s)"
+    (metaterm_to_classical left)
+    (metaterm_to_classical right)
+| And(left, right) ->
+  Format.sprintf "(and %s %s)"
+    (metaterm_to_classical left)
+    (metaterm_to_classical right)
+| Pred(term, restriction) ->
+  begin match observe term with
+  | Var(_) ->
+    let ty = tc [] term in
+    if ty = propty then
+      let str = term_to_string term in
+      Format.sprintf "(%s)" str
+    else failwith "Non-prop predicate type to classical"
+  | _ -> failwith "Unsupported predicate to classical"
+  end
+| Obj(_,_) | Binding(_,_,_) ->
+  failwith "Unsupported metaterm_to_classical"
+
+let rec props = function
+| True | False | Eq(_, _) ->
+  []
+| Arrow(l, r) | Or(l, r) | And(l, r) ->
+  (props l) @ (props r) |>
+  List.sort_uniq compare
+| Pred(t, _) ->
+  begin match observe t with
+  | Var(_) ->
+    let ty = tc [] t in
+    if ty = propty then [t] else []
+  | _ -> failwith "Unsupported predicate in props"
+  end
+| Obj(_,_) | Binding(_,_,_) ->
+  failwith "Unsupported metaterm in props"
+
+let metaterm_to_classical2 goal =
+  let bool_ty = tybase "bool" in
+  let connective name =
+    let binary_ty = tyarrow [bool_ty; bool_ty] bool_ty in
+    var Constant name 0 binary_ty in
+  let rec transform = function
+| True ->
+  var Constant "tt" 0 bool_ty
+| False ->
+  var Constant "ff" 0 bool_ty
+| Eq(left, right) ->
+  app (connective "eq" ) [left            ; right            ]
+| Arrow(left, right) ->
+  app (connective "imp") [(transform left); (transform right)]
+| Or(left, right) ->
+  app (connective "or" ) [(transform left); (transform right)]
+| And(left, right) ->
+  app (connective "and") [(transform left); (transform right)]
+| Pred(term, restriction) ->
+  begin match observe term with
+  | Var(_) ->
+    let ty = tc [] term in
+    if ty = propty then
+      let name = term_to_string term in
+      var Constant name 0 bool_ty
+    else failwith "Non-prop predicate type to classical"
+  | _ -> failwith "Unsupported predicate to classical"
+  end
+| Obj(_,_) | Binding(_,_,_) ->
+  failwith "Unsupported transform"
+  in
+  let goal_bool = transform goal in
+  let right =
+    app (var Constant "test_formula" 0 (tyarrow [oty] bool_ty)) [goal_bool] in
+  let context =
+    let name t =
+      let name_ty = tybase "name" in
+      let list_i_ty = tybase "list_i" in
+      let pred_pname_ty = (tyarrow [bool_ty; name_ty; list_i_ty] oty) in
+      let id = term_to_string t in
+      let name_id = Format.sprintf "name_%s" id in
+      app
+        (var Constant "pred_pname" 0 pred_pname_ty)
+        [
+          var Constant id      0 bool_ty ;
+          var Constant name_id 0 name_ty ;
+          var Constant "nil_i" 0 list_i_ty
+        ]
+    in
+    (props goal) |>
+    List.map name
+  in
+  Obj({context; right; mode = Async}, Irrelevant)
+
+(* Replace `prop` declarations across the signature with `bool`-typed
+ * constructors of the same name. For each such constructor, add a new
+ * constructor of type `name`, used by the string-unaware Abella version of
+ * the kernel.
+ *
+ * The mapping functions are somewhat reduntant and can be refactored. *)
+let prop_to_bool (ktables, ctables) =
+  let (props, nonprops) =
+    List.partition (fun (_, Poly(_, ty)) -> ty = propty) ctables in
+  let bools =
+    props |>
+    List.map
+      (fun (id, Poly(poly, _)) -> (id, Poly(poly, tybase "bool"))) in
+  let names =
+    let name str = Format.sprintf "name_%s" str in
+    props |>
+    List.map
+      (fun (id, Poly(poly, _)) -> ((name id), Poly(poly, tybase "name"))) in
+  (ktables, bools @ names @ nonprops)
+
+(* Certify the current goal with a certificate term (passed as an argument)
+ * using a standard translation from the reasoning logic, represented by type
+ * prop, to a kernel implementing an FPC framework and imported on the object
+ * level, and exposing a series predicates and its own object-level unpolarized
+ * formulas of type bool.
+ *
+ * Adapt sequent.goal to be used with cert, inlining parse_metaterm
+ * from Test_helper (Alternative 1). Alternative 2 is to generate the new
+ * metaterm as part of the translation, with all typing information being
+ * stated explicitly, and not inferred.
+ *
+ * The following won't work out of the box for prop and o, needing bool or
+ * whatever is defined as the object logic of the kernel. Terms, e.g., i,
+ * could work. *)
+let cert term handle_witness =
+  (* Load variables for field, plus a copy of the original signature. *)
+  let sr = default_sr ()
+  and old_sign = default_sign ()
+  and sign = default_sign ()
+  and ctx = sequent.vars in
+  (* Typecheck certificate-as-term. *)
+  let term = type_uterm ~sr ~sign ~ctx term in
+  let ty = tc [] term in
+  if not (ty = tybase "cert")
+    then failwith "The cert command can only be used on terms of type cert" ;
+  (* Translate prop and add name into the signature, and reload it locally. *)
+  update_sign None (prop_to_bool sign) ;
+  let sign = default_sign () in
+  (* Translate goal and context, compose and type new goal. *)
+  let translation_str = metaterm_to_classical sequent.goal in
+  let context_str =
+    props sequent.goal |>
+    List.map term_to_string |>
+    List.map (fun id -> Format.sprintf "pred_pname %s name_%s nil_i" id id) |>
+    String.concat ", "
+  in
+  let goal_str = begin match context_str with
+  | "" -> Format.sprintf "{test_formula (%s)}" translation_str
+  | _  -> Format.sprintf "{%s |- test_formula (%s)}" context_str translation_str
+  end in
+  let ugoal = Parser.metaterm Lexer.token (Lexing.from_string goal_str) in
+  let goal = Typing.type_umetaterm ~sr ~sign ~ctx ugoal in
+  (* A small variation on the search tactic, above.
+   * TODO: Refactor; consider other-than-default depth. *)
+  let search_result = search_goal_witness ?depth:(Some 500) goal WMagic in
+  (* Restore original signature before proceeding. *)
+  update_sign None old_sign ;
+  (* Analyze result and finish. *)
+  match search_result with
+  | None -> failwith "Search failed"
+  | Some w -> handle_witness w ; next_subgoal ()
