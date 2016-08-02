@@ -1478,9 +1478,17 @@ let cert ?depth ~term ~handle_witness () =
     List.map (fun id -> Format.sprintf "pred_pname %s name_%s nil_i" id id) |>
     String.concat ", "
   in
+  let cert_str = term_to_string term in
   let goal_str = begin match context_str with
-  | "" -> Format.sprintf "{test_formula (%s)}" translation_str
-  | _  -> Format.sprintf "{%s |- test_formula (%s)}" context_str translation_str
+  | "" ->
+    Format.sprintf "{test_cert (%s) (%s)}"
+      cert_str
+      translation_str
+  | _  ->
+    Format.sprintf "{%s |- test_cert (%s) (%s)}"
+      context_str
+      cert_str
+      translation_str
   end in
   let ugoal = Parser.metaterm Lexer.token (Lexing.from_string goal_str) in
   let goal = Typing.type_umetaterm ~sr ~sign ~ctx ugoal in
