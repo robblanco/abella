@@ -705,7 +705,7 @@ let search_goal_witness ?depth goal witness =
       ~witness
       goal
   in
-  List.find_some search_depth (List.range 1 depth)
+  search_depth depth
 
 let search_goal ?depth goal =
   try Option.is_some (search_goal_witness ?depth goal WMagic)
