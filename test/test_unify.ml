@@ -709,6 +709,21 @@ let tests =
                    assert_failure "Unification failed"
         );
 
+      "Plus-like decomposition" >::
+        (fun () ->
+           let str = "exists X Y Z,\
+(iapp (r1 t1) (iapp (r1 (r1 t1)) (iapp (r1 (r1 (r1 t1))) t2))) =\
+(iapp (r1 X ) (iapp Y            (iapp (r1 Z           ) t2)))" in
+           match parse_metaterm str with
+             | Binding(Exists, _, (Eq(left, right))) ->
+                 begin match try_right_unify_cpairs left right with
+                   | None ->
+                       assert_failure "Unification expected to succeed"
+                   | _ -> ()
+                 end
+             | _ -> assert false
+        );
+
       (* This is a case where unification has no most general
          solution, but it would be nice of a partial solution was at
          least generated. Perhaps more generally we could eventually
