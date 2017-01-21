@@ -894,8 +894,7 @@ let try_left_unify_cpairs ~used t1 t2 =
       Some !cpairs
     with
       | UnifyFailure _ -> set_scoped_bind_state state ; None
-      | UnifyError _ -> set_scoped_bind_state state ;
-          failwith "Unification error during case analysis"
+      | UnifyError _ -> assert false
 
 let try_right_unify_cpairs t1 t2 =
   try_with_state ~fail:None
